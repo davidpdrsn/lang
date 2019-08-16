@@ -1,0 +1,37 @@
+WHITESPACE = _{ " " | "\n" | "\r" | "\t" }
+COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+
+program = { SOI ~ function+ ~ EOI }
+
+function = {
+  "fn"
+  ~ identifier
+  ~ "(" ~ parameters ~ ")"
+  ~ "->" ~ type_
+  ~ "{" ~ function_body ~ "}"
+}
+
+type_ = { identifier }
+
+function_body = { statement* }
+
+statement = { function_call ~ ";" }
+
+function_call = { identifier ~ "(" ~ arguments ~ ")" }
+
+parameters = { ((identifier ~ ","?) ~ ","?)* }
+arguments = { ((expression ~ ","?) ~ ","?)* }
+
+expression = {
+  string | identifier
+}
+
+string = ${ "\"" ~ inner ~ "\"" }
+inner = @{ char* }
+char = {
+    !("\"" | "\\") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
