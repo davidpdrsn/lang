@@ -221,6 +221,7 @@ impl<'a> Parse<'a> for VariableBinding<'a> {
 pub enum Expr<'a> {
     StringLit(StringLit<'a>),
     IntegerLit(IntegerLit<'a>),
+    BooleanLit(BooleanLit<'a>),
     LocalVariable(LocalVariable<'a>),
     Call(Call<'a>),
 }
@@ -248,6 +249,7 @@ impl<'a> Parse<'a> for Expr<'a> {
             Rule::identifier => Expr::LocalVariable(LocalVariable::parse(inner)?),
             Rule::function_call => Expr::Call(Call::parse(inner)?),
             Rule::integer => Expr::IntegerLit(IntegerLit::parse(inner)?),
+            Rule::boolean => Expr::BooleanLit(BooleanLit::parse(inner)?),
             other => panic!("expr parse error at {:?}", other),
         };
 
@@ -287,6 +289,25 @@ impl<'a> Parse<'a> for IntegerLit<'a> {
             .parse()
             .expect("failed to parse integer literal as int. Should have been tokenizer error");
         Ok(IntegerLit { integer, span })
+    }
+}
+
+#[derive(Debug)]
+pub struct BooleanLit<'a> {
+    pub boolean: bool,
+    pub span: Span<'a>,
+}
+
+impl<'a> Parse<'a> for BooleanLit<'a> {
+    const RULE: Rule = Rule::boolean;
+
+    fn parse_pair_of_rule(lit: Pair<'a, Rule>) -> ParseResult<Self> {
+        let span = lit.as_span();
+        let boolean = lit
+            .as_str()
+            .parse()
+            .expect("failed to parse boolean literal as bool. Should have been tokenizer error");
+        Ok(BooleanLit { boolean, span })
     }
 }
 

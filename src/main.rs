@@ -184,4 +184,20 @@ mod test {
 
         assert_eq!(output, "1\n");
     }
+
+    #[test]
+    fn bools() {
+        let program = r#"
+            fn main() -> Void {
+                println(bool_to_string(true));
+                println(bool_to_string(false));
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
+        let output = unwrap_or_panic!(String::from_utf8(output));
+
+        assert_eq!(output, "true\nfalse\n");
+    }
 }

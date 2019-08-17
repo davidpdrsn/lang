@@ -122,6 +122,8 @@ impl<'a, W: Write> Evaluator<'a, W> {
 
             Expr::IntegerLit(lit) => Ok(Value::Integer(lit.integer)),
 
+            Expr::BooleanLit(lit) => Ok(Value::Boolean(lit.boolean)),
+
             Expr::LocalVariable(ident) => {
                 let name = &ident.name.name;
                 let value = env.get(name).ok_or_else(|| {
@@ -167,6 +169,10 @@ fn build_fn_env<W: Write>(program: Program) -> FnEnv<W> {
         "int_to_string",
         FnEnvEntry::BuiltIn(int_to_string_built_in()),
     );
+    fn_env.insert(
+        "bool_to_string",
+        FnEnvEntry::BuiltIn(bool_to_string_built_in()),
+    );
 
     fn_env
 }
@@ -193,6 +199,17 @@ fn int_to_string_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
     })
 }
 
+fn bool_to_string_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
+    Box::new(|_stdout: &mut W, env: &mut LocalEnv<'a>| {
+        let input = env
+            .get("input")
+            .expect("Built-in `bool_to_string` argument not found");
+        // TODO: type check should be bool
+        let string = format!("{}", input);
+        Ok(Some(Value::String(string)))
+    })
+}
+
 fn main_call(span: Span) -> Call {
     Call {
         name: Ident {
@@ -208,6 +225,7 @@ fn main_call(span: Span) -> Call {
 enum Value {
     String(String),
     Integer(i32),
+    Boolean(bool),
 }
 
 impl fmt::Display for Value {
@@ -215,6 +233,7 @@ impl fmt::Display for Value {
         match self {
             Value::String(s) => write!(f, "{}", s),
             Value::Integer(i) => write!(f, "{}", i),
+            Value::Boolean(b) => write!(f, "{}", b),
         }
     }
 }
