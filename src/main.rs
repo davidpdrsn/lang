@@ -169,4 +169,19 @@ mod test {
 
         assert_eq!(output, "hi\n");
     }
+
+    #[test]
+    fn integers() {
+        let program = r#"
+            fn main() -> Void {
+                println(int_to_string(1));
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
+        let output = unwrap_or_panic!(String::from_utf8(output));
+
+        assert_eq!(output, "1\n");
+    }
 }

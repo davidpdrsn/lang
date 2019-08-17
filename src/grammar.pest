@@ -31,6 +31,7 @@ arguments = { ((expression ~ ","?) ~ ","?)* }
 
 expression = {
   string
+  | integer
   | function_call
   | identifier
 }
@@ -44,5 +45,7 @@ char = {
     | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
     | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
+
+integer = { ASCII_DIGIT+ }
 
 identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }

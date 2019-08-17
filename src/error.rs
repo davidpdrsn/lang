@@ -11,7 +11,6 @@ pub enum Error<'a> {
     ParseError(ParseError),
     UndefinedFunction(String, Span<'a>),
     UndefinedLocalVariable(String, Span<'a>),
-    #[allow(dead_code)]
     WrongNumberOfArguments {
         expected: usize,
         got: usize,

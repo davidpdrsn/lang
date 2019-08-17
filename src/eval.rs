@@ -118,7 +118,9 @@ impl<'a, W: Write> Evaluator<'a, W> {
         env: &LocalEnv<'a>,
     ) -> Result<'a, Value> {
         match expr {
-            Expr::StringLit(string_lit) => Ok(Value::String(string_lit.contents.to_string())),
+            Expr::StringLit(lit) => Ok(Value::String(lit.contents.to_string())),
+
+            Expr::IntegerLit(lit) => Ok(Value::Integer(lit.integer)),
 
             Expr::LocalVariable(ident) => {
                 let name = &ident.name.name;
@@ -153,7 +155,7 @@ enum FnEnvEntry<'a, W> {
     BuiltIn(BuiltIn<'a, W>),
 }
 
-fn build_fn_env<'a, W: Write>(program: Program<'a>) -> FnEnv<'a, W> {
+fn build_fn_env<W: Write>(program: Program) -> FnEnv<W> {
     let mut fn_env = HashMap::new();
 
     for function in program.functions {
@@ -161,6 +163,10 @@ fn build_fn_env<'a, W: Write>(program: Program<'a>) -> FnEnv<'a, W> {
     }
 
     fn_env.insert("println", FnEnvEntry::BuiltIn(println_built_in()));
+    fn_env.insert(
+        "int_to_string",
+        FnEnvEntry::BuiltIn(int_to_string_built_in()),
+    );
 
     fn_env
 }
@@ -170,8 +176,20 @@ fn println_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
         let input = env
             .get("input")
             .expect("Built-in `println` argument not found");
-        writeln!(stdout, "{}", input).unwrap();
+        // TODO: type check. Should be string
+        writeln!(stdout, "{}", input).expect("`println` failed to write");
         Ok(None)
+    })
+}
+
+fn int_to_string_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
+    Box::new(|_stdout: &mut W, env: &mut LocalEnv<'a>| {
+        let input = env
+            .get("input")
+            .expect("Built-in `int_to_string` argument not found");
+        // TODO: type check should be integer
+        let string = format!("{}", input);
+        Ok(Some(Value::String(string)))
     })
 }
 
@@ -189,12 +207,14 @@ fn main_call(span: Span) -> Call {
 #[derive(Debug, Clone)]
 enum Value {
     String(String),
+    Integer(i32),
 }
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Value::String(s) => write!(f, "{}", s),
+            Value::Integer(i) => write!(f, "{}", i),
         }
     }
 }

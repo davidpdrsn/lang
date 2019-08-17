@@ -220,6 +220,7 @@ impl<'a> Parse<'a> for VariableBinding<'a> {
 #[derive(Debug)]
 pub enum Expr<'a> {
     StringLit(StringLit<'a>),
+    IntegerLit(IntegerLit<'a>),
     LocalVariable(LocalVariable<'a>),
     Call(Call<'a>),
 }
@@ -246,6 +247,7 @@ impl<'a> Parse<'a> for Expr<'a> {
             Rule::string => Expr::StringLit(StringLit::parse(inner)?),
             Rule::identifier => Expr::LocalVariable(LocalVariable::parse(inner)?),
             Rule::function_call => Expr::Call(Call::parse(inner)?),
+            Rule::integer => Expr::IntegerLit(IntegerLit::parse(inner)?),
             other => panic!("expr parse error at {:?}", other),
         };
 
@@ -266,6 +268,25 @@ impl<'a> Parse<'a> for StringLit<'a> {
         let span = string_lit.as_span();
         let contents = string_lit.into_inner().next().unwrap().as_span().as_str();
         Ok(StringLit { contents, span })
+    }
+}
+
+#[derive(Debug)]
+pub struct IntegerLit<'a> {
+    pub integer: i32,
+    pub span: Span<'a>,
+}
+
+impl<'a> Parse<'a> for IntegerLit<'a> {
+    const RULE: Rule = Rule::integer;
+
+    fn parse_pair_of_rule(integer_lit: Pair<'a, Rule>) -> ParseResult<Self> {
+        let span = integer_lit.as_span();
+        let integer = integer_lit
+            .as_str()
+            .parse()
+            .expect("failed to parse integer literal as int. Should have been tokenizer error");
+        Ok(IntegerLit { integer, span })
     }
 }
 
