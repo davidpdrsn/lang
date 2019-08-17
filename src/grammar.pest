@@ -19,9 +19,12 @@ statement = { statement_inner ~ ";" }
 statement_inner = _{
   function_call
   | return_statement
+  | variable_binding
 }
 
 return_statement = { "return" ~ expression }
+
+variable_binding = { "let" ~ identifier ~ "=" ~ expression }
 
 parameters = { ((identifier ~ ","?) ~ ","?)* }
 arguments = { ((expression ~ ","?) ~ ","?)* }

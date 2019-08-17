@@ -132,6 +132,7 @@ impl<'a> Parse<'a> for Vec<Statement<'a>> {
 pub enum Statement<'a> {
     Call(Call<'a>),
     Return(Return<'a>),
+    VariableBinding(VariableBinding<'a>),
 }
 
 impl<'a> Parse<'a> for Statement<'a> {
@@ -144,6 +145,7 @@ impl<'a> Parse<'a> for Statement<'a> {
         match inner.as_rule() {
             Rule::function_call => Ok(Statement::Call(Call::parse(inner)?)),
             Rule::return_statement => Ok(Statement::Return(Return::parse(inner)?)),
+            Rule::variable_binding => Ok(Statement::VariableBinding(VariableBinding::parse(inner)?)),
             other => panic!("statement parse error at {:?}", other),
         }
     }
@@ -190,6 +192,27 @@ impl<'a> Parse<'a> for Return<'a> {
         let expr = Expr::parse(return_statement.next().unwrap())?;
 
         Ok(Return { expr, span })
+    }
+}
+
+#[derive(Debug)]
+pub struct VariableBinding<'a> {
+    pub name: Ident<'a>,
+    pub expr: Expr<'a>,
+    pub span: Span<'a>,
+}
+
+impl<'a> Parse<'a> for VariableBinding<'a> {
+    const RULE: Rule = Rule::variable_binding;
+
+    fn parse_pair_of_rule(binding: Pair<'a, Rule>) -> ParseResult<Self> {
+        let span = binding.as_span();
+        let mut binding = binding.into_inner();
+
+        let name = Ident::parse(binding.next().unwrap())?;
+        let expr = Expr::parse(binding.next().unwrap())?;
+
+        Ok(VariableBinding { name, expr, span })
     }
 }
 

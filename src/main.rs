@@ -146,4 +146,20 @@ mod test {
 
         assert_eq!(output, "hi\n");
     }
+
+    #[test]
+    fn variable_bindings() {
+        let program = r#"
+            fn main() -> Void {
+                let a = "hi";
+                println(a);
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
+        let output = unwrap_or_panic!(String::from_utf8(output));
+
+        assert_eq!(output, "hi\n");
+    }
 }

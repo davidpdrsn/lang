@@ -16,8 +16,8 @@ impl<'a, W: Write> Evaluator<'a, W> {
         let fn_env = build_fn_env(program);
         let call = main_call(span);
 
-        let mut env = LocalEnv::new();
-        Evaluator::new(stdout).eval_call(&call, &fn_env, &mut env)?;
+        let env = LocalEnv::new();
+        Evaluator::new(stdout).eval_call(&call, &fn_env, &env)?;
 
         Ok(())
     }
@@ -37,11 +37,17 @@ impl<'a, W: Write> Evaluator<'a, W> {
                 self.eval_call(call, fn_env, env)?;
                 Ok(StatementEvalResult::Value)
             }
+
             Statement::Return(return_statement) => {
-                let value = self
-                    .eval_return_statement(return_statement, fn_env, env)?
-                    .expect("TODO");
+                let value = self.eval_expr(&return_statement.expr, fn_env, env)?;
                 Ok(StatementEvalResult::Return(value))
+            }
+
+            Statement::VariableBinding(binding) => {
+                let name = &binding.name.name;
+                let value = self.eval_expr(&binding.expr, fn_env, env)?;
+                env.insert(name, value);
+                Ok(StatementEvalResult::Value)
             }
         }
     }
@@ -88,16 +94,6 @@ impl<'a, W: Write> Evaluator<'a, W> {
         }
     }
 
-    fn eval_return_statement(
-        &mut self,
-        return_statement: &Return<'a>,
-        fn_env: &FnEnv<'a, W>,
-        env: &LocalEnv<'a>,
-    ) -> Result<'a, Option<Value>> {
-        let value = self.eval_expr(&return_statement.expr, fn_env, env)?;
-        Ok(Some(value))
-    }
-
     fn eval_expr(
         &mut self,
         expr: &Expr<'a>,
@@ -106,6 +102,7 @@ impl<'a, W: Write> Evaluator<'a, W> {
     ) -> Result<'a, Value> {
         match expr {
             Expr::StringLit(string_lit) => Ok(Value::String(string_lit.contents.to_string())),
+
             Expr::LocalVariable(ident) => {
                 let name = &ident.name.name;
                 let value = env.get(name).ok_or_else(|| {
@@ -113,8 +110,11 @@ impl<'a, W: Write> Evaluator<'a, W> {
                 })?;
                 Ok(value.clone())
             }
+
             Expr::Call(call) => {
-                let value = self.eval_call(call, fn_env, env)?.expect("TODO");
+                let value = self
+                    .eval_call(call, fn_env, env)?
+                    .expect("call expression returned void. Should be caught by type checking");
                 Ok(value)
             }
         }
