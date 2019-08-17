@@ -57,7 +57,7 @@ impl Interpreter {
     fn interpret<'a, W: io::Write>(
         self,
         program: &'a str,
-        stdout: &mut W,
+        stdout: &'a mut W,
     ) -> Result<(), Error<'a>> {
         let mut pairs = Tokenizer::parse(Rule::program, program)?;
         let pair = pairs.next().unwrap();
@@ -122,5 +122,28 @@ mod test {
         let output = unwrap_or_panic!(String::from_utf8(output));
 
         assert_eq!(output, "a\nb\n");
+    }
+
+    #[test]
+    fn returning_values() {
+        let program = r#"
+            fn main() -> Void {
+                print_it(id("hi"));
+            }
+
+            fn print_it(a) -> Void {
+                println(a);
+            }
+
+            fn id(a) -> String {
+                return a;
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
+        let output = unwrap_or_panic!(String::from_utf8(output));
+
+        assert_eq!(output, "hi\n");
     }
 }

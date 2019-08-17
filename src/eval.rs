@@ -5,30 +5,53 @@ use std::collections::HashMap;
 use std::fmt;
 use std::io::Write;
 
-pub struct Evaluator;
+pub struct Evaluator<'a, W> {
+    stdout: &'a mut W,
+}
 
-impl Evaluator {
-    pub fn evaluate<'a, W: Write>(program: Program<'a>, stdout: &mut W) -> Result<'a, ()> {
+impl<'a, W: Write> Evaluator<'a, W> {
+    pub fn evaluate(program: Program<'a>, stdout: &'a mut W) -> Result<'a, ()> {
         let span = program.span.clone();
 
         let fn_env = build_fn_env(program);
         let call = main_call(span);
 
         let mut env = LocalEnv::new();
-        Evaluator.eval_call(&call, &fn_env, &mut env, stdout)?;
+        Evaluator::new(stdout).eval_call(&call, &fn_env, &mut env)?;
 
         Ok(())
     }
-}
 
-impl Evaluator {
-    fn eval_call<'a, W: Write>(
-        &self,
-        call: &Call<'a>,
+    fn new(stdout: &'a mut W) -> Self {
+        Evaluator { stdout }
+    }
+
+    fn eval_statement(
+        &mut self,
+        stmt: &Statement<'a>,
         fn_env: &FnEnv<'a, W>,
         env: &mut LocalEnv<'a>,
-        stdout: &mut W,
-    ) -> Result<'a, Value> {
+    ) -> Result<'a, StatementEvalResult> {
+        match stmt {
+            Statement::Call(call) => {
+                self.eval_call(call, fn_env, env)?;
+                Ok(StatementEvalResult::Value)
+            }
+            Statement::Return(return_statement) => {
+                let value = self
+                    .eval_return_statement(return_statement, fn_env, env)?
+                    .expect("TODO");
+                Ok(StatementEvalResult::Return(value))
+            }
+        }
+    }
+
+    fn eval_call(
+        &mut self,
+        call: &Call<'a>,
+        fn_env: &FnEnv<'a, W>,
+        env: &LocalEnv<'a>,
+    ) -> Result<'a, Option<Value>> {
         let name_to_call = call.name.name;
 
         let function = fn_env
@@ -38,48 +61,48 @@ impl Evaluator {
         match function {
             FnEnvEntry::Function(f) => {
                 let mut inner_env = LocalEnv::new();
+                // TODO: assert sizes are equal
                 for (param, arg) in f.parameters.0.iter().zip(&call.args) {
-                    let value = self.eval_expr(arg, fn_env, env, stdout)?;
+                    let value = self.eval_expr(arg, fn_env, env)?;
                     inner_env.insert(param.name, value);
                 }
 
-                let mut return_value = Value::Void;
                 for statement in &f.body {
-                    return_value =
-                        self.eval_statement(statement, fn_env, &mut inner_env, stdout)?;
+                    match self.eval_statement(statement, fn_env, &mut inner_env)? {
+                        StatementEvalResult::Value => {}
+                        StatementEvalResult::Return(value) => return Ok(Some(value)),
+                    }
                 }
-                Ok(return_value)
+                Ok(None)
             }
             FnEnvEntry::BuiltIn(f) => {
                 let mut inner_env = LocalEnv::new();
+                // TODO: assert only given one arg
                 for (name, arg) in ["input"].iter().zip(&call.args) {
-                    let value = self.eval_expr(arg, fn_env, env, stdout)?;
+                    let value = self.eval_expr(arg, fn_env, env)?;
                     inner_env.insert(name, value);
                 }
 
-                f(stdout, &mut inner_env)
+                f(&mut self.stdout, &mut inner_env)
             }
         }
     }
 
-    fn eval_statement<'a, W: Write>(
-        &self,
-        stmt: &Statement<'a>,
+    fn eval_return_statement(
+        &mut self,
+        return_statement: &Return<'a>,
         fn_env: &FnEnv<'a, W>,
-        env: &mut LocalEnv<'a>,
-        stdout: &mut W,
-    ) -> Result<'a, Value> {
-        match stmt {
-            Statement::Call(call) => self.eval_call(call, fn_env, env, stdout),
-        }
+        env: &LocalEnv<'a>,
+    ) -> Result<'a, Option<Value>> {
+        let value = self.eval_expr(&return_statement.expr, fn_env, env)?;
+        Ok(Some(value))
     }
 
-    fn eval_expr<'a, W: Write>(
-        &self,
+    fn eval_expr(
+        &mut self,
         expr: &Expr<'a>,
         fn_env: &FnEnv<'a, W>,
         env: &LocalEnv<'a>,
-        stdout: &mut W,
     ) -> Result<'a, Value> {
         match expr {
             Expr::StringLit(string_lit) => Ok(Value::String(string_lit.contents.to_string())),
@@ -90,14 +113,23 @@ impl Evaluator {
                 })?;
                 Ok(value.clone())
             }
+            Expr::Call(call) => {
+                let value = self.eval_call(call, fn_env, env)?.expect("TODO");
+                Ok(value)
+            }
         }
     }
+}
+
+enum StatementEvalResult {
+    Value,
+    Return(Value),
 }
 
 type FnEnv<'a, W> = HashMap<&'a str, FnEnvEntry<'a, W>>;
 type LocalEnv<'a> = HashMap<&'a str, Value>;
 
-type BuiltIn<'a, W> = Box<Fn(&mut W, &mut LocalEnv<'a>) -> Result<'a, Value>>;
+type BuiltIn<'a, W> = Box<Fn(&mut W, &mut LocalEnv<'a>) -> Result<'a, Option<Value>>>;
 
 enum FnEnvEntry<'a, W> {
     Function(Function<'a>),
@@ -118,9 +150,11 @@ fn build_fn_env<'a, W: Write>(program: Program<'a>) -> FnEnv<'a, W> {
 
 fn println_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
     Box::new(|stdout: &mut W, env: &mut LocalEnv<'a>| {
-        let input = env.get("input").expect("Built-in `println` argument not found");
+        let input = env
+            .get("input")
+            .expect("Built-in `println` argument not found");
         writeln!(stdout, "{}", input);
-        Ok(Value::Void)
+        Ok(None)
     })
 }
 
@@ -137,14 +171,12 @@ fn main_call(span: Span) -> Call {
 
 #[derive(Debug, Clone)]
 enum Value {
-    Void,
     String(String),
 }
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Value::Void => write!(f, "void"),
             Value::String(s) => write!(f, "{}", s),
         }
     }

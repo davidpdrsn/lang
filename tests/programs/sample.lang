@@ -1,1 +1,3 @@
-fn main() -> Void {}
+fn main() -> Void {
+    println("Hi there");
+}

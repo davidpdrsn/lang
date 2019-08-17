@@ -131,6 +131,7 @@ impl<'a> Parse<'a> for Vec<Statement<'a>> {
 #[derive(Debug)]
 pub enum Statement<'a> {
     Call(Call<'a>),
+    Return(Return<'a>),
 }
 
 impl<'a> Parse<'a> for Statement<'a> {
@@ -142,7 +143,8 @@ impl<'a> Parse<'a> for Statement<'a> {
 
         match inner.as_rule() {
             Rule::function_call => Ok(Statement::Call(Call::parse(inner)?)),
-            _ => panic!("statement parse error"),
+            Rule::return_statement => Ok(Statement::Return(Return::parse(inner)?)),
+            other => panic!("statement parse error at {:?}", other),
         }
     }
 }
@@ -173,9 +175,29 @@ impl<'a> Parse<'a> for Call<'a> {
 }
 
 #[derive(Debug)]
+pub struct Return<'a> {
+    pub expr: Expr<'a>,
+    pub span: Span<'a>,
+}
+
+impl<'a> Parse<'a> for Return<'a> {
+    const RULE: Rule = Rule::return_statement;
+
+    fn parse_pair_of_rule(return_statement: Pair<'a, Rule>) -> ParseResult<Self> {
+        let span = return_statement.as_span();
+        let mut return_statement = return_statement.into_inner();
+
+        let expr = Expr::parse(return_statement.next().unwrap())?;
+
+        Ok(Return { expr, span })
+    }
+}
+
+#[derive(Debug)]
 pub enum Expr<'a> {
     StringLit(StringLit<'a>),
     LocalVariable(LocalVariable<'a>),
+    Call(Call<'a>),
 }
 
 impl<'a> Parse<'a> for Vec<Expr<'a>> {
@@ -200,7 +222,8 @@ impl<'a> Parse<'a> for Expr<'a> {
         let parsed = match inner.as_rule() {
             Rule::string => Expr::StringLit(StringLit::parse(inner)?),
             Rule::identifier => Expr::LocalVariable(LocalVariable::parse(inner)?),
-            _ => panic!("expr parse error"),
+            Rule::function_call => Expr::Call(Call::parse(inner)?),
+            other => panic!("expr parse error at {:?}", other),
         };
 
         Ok(parsed)

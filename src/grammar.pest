@@ -15,16 +15,24 @@ type_ = { identifier }
 
 function_body = { statement* }
 
-statement = { function_call ~ ";" }
+statement = { statement_inner ~ ";" }
+statement_inner = _{
+  function_call
+  | return_statement
+}
 
-function_call = { identifier ~ "(" ~ arguments ~ ")" }
+return_statement = { "return" ~ expression }
 
 parameters = { ((identifier ~ ","?) ~ ","?)* }
 arguments = { ((expression ~ ","?) ~ ","?)* }
 
 expression = {
-  string | identifier
+  string
+  | function_call
+  | identifier
 }
+
+function_call = { identifier ~ "(" ~ arguments ~ ")" }
 
 string = ${ "\"" ~ inner ~ "\"" }
 inner = @{ char* }
