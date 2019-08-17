@@ -2,7 +2,6 @@ use crate::ast::*;
 use crate::error::{Error, Result};
 use pest::Span;
 use std::collections::HashMap;
-use std::fmt;
 use std::io::Write;
 
 pub struct Evaluator<'a, W> {
@@ -45,6 +44,21 @@ impl<'a, W: Write> Evaluator<'a, W> {
 
             Statement::VariableBinding(binding) => {
                 let name = &binding.name.name;
+                let value = self.eval_expr(&binding.expr, fn_env, env)?;
+                env.insert(name, value);
+                Ok(StatementEvalResult::Value)
+            }
+
+            Statement::ReassignVariable(binding) => {
+                let name = &binding.name.name;
+
+                if !env.contains_key(name) {
+                    return Err(Error::UndefinedLocalVariable(
+                        name.to_string(),
+                        binding.span.clone(),
+                    ));
+                }
+
                 let value = self.eval_expr(&binding.expr, fn_env, env)?;
                 env.insert(name, value);
                 Ok(StatementEvalResult::Value)
@@ -124,6 +138,14 @@ impl<'a, W: Write> Evaluator<'a, W> {
 
             Expr::BooleanLit(lit) => Ok(Value::Boolean(lit.boolean)),
 
+            Expr::ListLit(lit) => {
+                let mut acc = vec![];
+                for element in &lit.elements {
+                    acc.push(self.eval_expr(&element, fn_env, env)?);
+                }
+                Ok(Value::List(acc))
+            }
+
             Expr::LocalVariable(ident) => {
                 let name = &ident.name.name;
                 let value = env.get(name).ok_or_else(|| {
@@ -173,6 +195,7 @@ fn build_fn_env<W: Write>(program: Program) -> FnEnv<W> {
         "bool_to_string",
         FnEnvEntry::BuiltIn(bool_to_string_built_in()),
     );
+    fn_env.insert("length", FnEnvEntry::BuiltIn(length_built_in()));
 
     fn_env
 }
@@ -182,6 +205,7 @@ fn println_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
         let input = env
             .get("input")
             .expect("Built-in `println` argument not found");
+
         if let Value::String(input) = input {
             writeln!(stdout, "{}", input).expect("`println` failed to write");
             Ok(None)
@@ -196,9 +220,13 @@ fn int_to_string_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
         let input = env
             .get("input")
             .expect("Built-in `int_to_string` argument not found");
-        // TODO: type check should be integer
-        let string = format!("{}", input);
-        Ok(Some(Value::String(string)))
+
+        if let Value::Integer(i) = input {
+            let string = format!("{}", i);
+            Ok(Some(Value::String(string)))
+        } else {
+            unimplemented!("type error")
+        }
     })
 }
 
@@ -207,9 +235,27 @@ fn bool_to_string_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
         let input = env
             .get("input")
             .expect("Built-in `bool_to_string` argument not found");
-        // TODO: type check should be bool
-        let string = format!("{}", input);
-        Ok(Some(Value::String(string)))
+
+        if let Value::Boolean(i) = input {
+            let string = format!("{}", i);
+            Ok(Some(Value::String(string)))
+        } else {
+            unimplemented!("type error")
+        }
+    })
+}
+
+fn length_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
+    Box::new(|_stdout: &mut W, env: &mut LocalEnv<'a>| {
+        let input = env
+            .get("input")
+            .expect("Built-in `length` argument not found");
+
+        if let Value::List(list) = input {
+            Ok(Some(Value::Integer(list.len() as i32)))
+        } else {
+            unimplemented!("type error")
+        }
     })
 }
 
@@ -229,14 +275,5 @@ enum Value {
     String(String),
     Integer(i32),
     Boolean(bool),
-}
-
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Value::String(s) => write!(f, "{}", s),
-            Value::Integer(i) => write!(f, "{}", i),
-            Value::Boolean(b) => write!(f, "{}", b),
-        }
-    }
+    List(Vec<Value>),
 }

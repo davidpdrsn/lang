@@ -20,11 +20,14 @@ statement_inner = _{
   function_call
   | return_statement
   | variable_binding
+  | reassign_variable
 }
 
 return_statement = { "return" ~ expression }
 
 variable_binding = { "let" ~ identifier ~ "=" ~ expression }
+
+reassign_variable = { identifier ~ "=" ~ expression }
 
 parameters = { ((identifier ~ ","?) ~ ","?)* }
 arguments = { ((expression ~ ","?) ~ ","?)* }
@@ -35,6 +38,7 @@ expression = {
   | integer
   | function_call
   | identifier
+  | list
 }
 
 function_call = { identifier ~ "(" ~ arguments ~ ")" }
@@ -50,5 +54,8 @@ char = {
 integer = { ASCII_DIGIT+ }
 
 boolean = { "true" | "false" }
+
+list = { "[" ~ list_elements ~ "]" }
+list_elements = _{ ((expression ~ ","?) ~ ","?)* }
 
 identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }

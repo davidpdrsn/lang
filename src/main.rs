@@ -200,4 +200,38 @@ mod test {
 
         assert_eq!(output, "true\nfalse\n");
     }
+
+    #[test]
+    fn lists() {
+        let program = r#"
+            fn main() -> Void {
+                let list = [1, 2, 3];
+                println(int_to_string(length(list)));
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
+        let output = unwrap_or_panic!(String::from_utf8(output));
+
+        assert_eq!(output, "3\n");
+    }
+
+    #[test]
+    fn reassign() {
+        let program = r#"
+            fn main() -> Void {
+                let a = "first";
+                println(a);
+                a = "second";
+                println(a);
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
+        let output = unwrap_or_panic!(String::from_utf8(output));
+
+        assert_eq!(output, "first\nsecond\n");
+    }
 }

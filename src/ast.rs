@@ -133,6 +133,7 @@ pub enum Statement<'a> {
     Call(Call<'a>),
     Return(Return<'a>),
     VariableBinding(VariableBinding<'a>),
+    ReassignVariable(ReassignVariable<'a>),
 }
 
 impl<'a> Parse<'a> for Statement<'a> {
@@ -146,6 +147,9 @@ impl<'a> Parse<'a> for Statement<'a> {
             Rule::return_statement => Ok(Statement::Return(Return::parse(inner)?)),
             Rule::variable_binding => {
                 Ok(Statement::VariableBinding(VariableBinding::parse(inner)?))
+            }
+            Rule::reassign_variable => {
+                Ok(Statement::ReassignVariable(ReassignVariable::parse(inner)?))
             }
             other => panic!("statement parse error at {:?}", other),
         }
@@ -218,10 +222,32 @@ impl<'a> Parse<'a> for VariableBinding<'a> {
 }
 
 #[derive(Debug)]
+pub struct ReassignVariable<'a> {
+    pub name: Ident<'a>,
+    pub expr: Expr<'a>,
+    pub span: Span<'a>,
+}
+
+impl<'a> Parse<'a> for ReassignVariable<'a> {
+    const RULE: Rule = Rule::reassign_variable;
+
+    fn parse_pair_of_rule(binding: Pair<'a, Rule>) -> ParseResult<Self> {
+        let span = binding.as_span();
+        let mut binding = binding.into_inner();
+
+        let name = Ident::parse(binding.next().unwrap())?;
+        let expr = Expr::parse(binding.next().unwrap())?;
+
+        Ok(ReassignVariable { name, expr, span })
+    }
+}
+
+#[derive(Debug)]
 pub enum Expr<'a> {
     StringLit(StringLit<'a>),
     IntegerLit(IntegerLit<'a>),
     BooleanLit(BooleanLit<'a>),
+    ListLit(ListLit<'a>),
     LocalVariable(LocalVariable<'a>),
     Call(Call<'a>),
 }
@@ -250,6 +276,7 @@ impl<'a> Parse<'a> for Expr<'a> {
             Rule::function_call => Expr::Call(Call::parse(inner)?),
             Rule::integer => Expr::IntegerLit(IntegerLit::parse(inner)?),
             Rule::boolean => Expr::BooleanLit(BooleanLit::parse(inner)?),
+            Rule::list => Expr::ListLit(ListLit::parse(inner)?),
             other => panic!("expr parse error at {:?}", other),
         };
 
@@ -308,6 +335,25 @@ impl<'a> Parse<'a> for BooleanLit<'a> {
             .parse()
             .expect("failed to parse boolean literal as bool. Should have been tokenizer error");
         Ok(BooleanLit { boolean, span })
+    }
+}
+
+#[derive(Debug)]
+pub struct ListLit<'a> {
+    pub elements: Vec<Expr<'a>>,
+    pub span: Span<'a>,
+}
+
+impl<'a> Parse<'a> for ListLit<'a> {
+    const RULE: Rule = Rule::list;
+
+    fn parse_pair_of_rule(lit: Pair<'a, Rule>) -> ParseResult<Self> {
+        let span = lit.as_span();
+        let mut elements = vec![];
+        for pair in lit.into_inner() {
+            elements.push(Expr::parse(pair)?);
+        }
+        Ok(ListLit { elements, span })
     }
 }
 
