@@ -182,9 +182,12 @@ fn println_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
         let input = env
             .get("input")
             .expect("Built-in `println` argument not found");
-        // TODO: type check. Should be string
-        writeln!(stdout, "{}", input).expect("`println` failed to write");
-        Ok(None)
+        if let Value::String(input) = input {
+            writeln!(stdout, "{}", input).expect("`println` failed to write");
+            Ok(None)
+        } else {
+            panic!("Type error. `println` only supports strings")
+        }
     })
 }
 
