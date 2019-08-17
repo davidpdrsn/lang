@@ -1,3 +1,10 @@
+#![deny(
+    unused_must_use,
+    unknown_lints,
+    dead_code,
+    unused_variables,
+    unused_imports
+)]
 #[macro_use]
 extern crate pest_derive;
 

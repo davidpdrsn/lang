@@ -1,5 +1,5 @@
 use crate::Rule;
-use pest::iterators::{Pair, Pairs};
+use pest::iterators::Pair;
 use pest::Span;
 use std::fmt::{self, Write};
 
@@ -35,9 +35,9 @@ trait Parse<'a>: Sized {
             Self::parse_pair_of_rule(pair)
         } else {
             let mut f = String::new();
-            writeln!(f, "Parse error");
-            writeln!(f, "Expected {:?}", Self::RULE);
-            writeln!(f, "Got {}", pair.as_str());
+            writeln!(f, "Parse error").unwrap();
+            writeln!(f, "Expected {:?}", Self::RULE).unwrap();
+            writeln!(f, "Got {}", pair.as_str()).unwrap();
             panic!("{}", f)
         }
     }
@@ -139,13 +139,14 @@ impl<'a> Parse<'a> for Statement<'a> {
     const RULE: Rule = Rule::statement;
 
     fn parse_pair_of_rule(statement: Pair<'a, Rule>) -> ParseResult<Self> {
-        let span = statement.as_span();
         let inner = statement.into_inner().next().unwrap();
 
         match inner.as_rule() {
             Rule::function_call => Ok(Statement::Call(Call::parse(inner)?)),
             Rule::return_statement => Ok(Statement::Return(Return::parse(inner)?)),
-            Rule::variable_binding => Ok(Statement::VariableBinding(VariableBinding::parse(inner)?)),
+            Rule::variable_binding => {
+                Ok(Statement::VariableBinding(VariableBinding::parse(inner)?))
+            }
             other => panic!("statement parse error at {:?}", other),
         }
     }
@@ -239,7 +240,6 @@ impl<'a> Parse<'a> for Expr<'a> {
     const RULE: Rule = Rule::expression;
 
     fn parse_pair_of_rule(expr: Pair<'a, Rule>) -> ParseResult<Self> {
-        let span = expr.as_span();
         let inner = expr.into_inner().next().unwrap();
 
         let parsed = match inner.as_rule() {

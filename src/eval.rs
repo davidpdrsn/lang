@@ -58,6 +58,7 @@ impl<'a, W: Write> Evaluator<'a, W> {
         fn_env: &FnEnv<'a, W>,
         env: &LocalEnv<'a>,
     ) -> Result<'a, Option<Value>> {
+        let span = call.span.clone();
         let name_to_call = call.name.name;
 
         let function = fn_env
@@ -67,7 +68,15 @@ impl<'a, W: Write> Evaluator<'a, W> {
         match function {
             FnEnvEntry::Function(f) => {
                 let mut inner_env = LocalEnv::new();
-                // TODO: assert sizes are equal
+
+                if f.parameters.0.len() != call.args.len() {
+                    return Err(Error::WrongNumberOfArguments {
+                        expected: f.parameters.0.len(),
+                        got: call.args.len(),
+                        span,
+                    });
+                }
+
                 for (param, arg) in f.parameters.0.iter().zip(&call.args) {
                     let value = self.eval_expr(arg, fn_env, env)?;
                     inner_env.insert(param.name, value);
@@ -83,7 +92,15 @@ impl<'a, W: Write> Evaluator<'a, W> {
             }
             FnEnvEntry::BuiltIn(f) => {
                 let mut inner_env = LocalEnv::new();
-                // TODO: assert only given one arg
+
+                if call.args.len() != 1 {
+                    return Err(Error::WrongNumberOfArguments {
+                        expected: 1,
+                        got: call.args.len(),
+                        span,
+                    });
+                }
+
                 for (name, arg) in ["input"].iter().zip(&call.args) {
                     let value = self.eval_expr(arg, fn_env, env)?;
                     inner_env.insert(name, value);
@@ -153,7 +170,7 @@ fn println_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
         let input = env
             .get("input")
             .expect("Built-in `println` argument not found");
-        writeln!(stdout, "{}", input);
+        writeln!(stdout, "{}", input).unwrap();
         Ok(None)
     })
 }
