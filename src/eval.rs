@@ -2,6 +2,7 @@ use crate::ast::*;
 use crate::error::{Error, Result};
 use pest::Span;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::io::Write;
 
 pub struct Evaluator<'a, W> {
@@ -34,7 +35,7 @@ impl<'a, W: Write> Evaluator<'a, W> {
         match stmt {
             Statement::Call(call) => {
                 self.eval_call(call, fn_env, env)?;
-                Ok(StatementEvalResult::Value)
+                Ok(StatementEvalResult::Void)
             }
 
             Statement::Return(return_statement) => {
@@ -46,7 +47,7 @@ impl<'a, W: Write> Evaluator<'a, W> {
                 let name = &binding.name.name;
                 let value = self.eval_expr(&binding.expr, fn_env, env)?;
                 env.insert(name, value);
-                Ok(StatementEvalResult::Value)
+                Ok(StatementEvalResult::Void)
             }
 
             Statement::ReassignVariable(binding) => {
@@ -61,7 +62,36 @@ impl<'a, W: Write> Evaluator<'a, W> {
 
                 let value = self.eval_expr(&binding.expr, fn_env, env)?;
                 env.insert(name, value);
-                Ok(StatementEvalResult::Value)
+                Ok(StatementEvalResult::Void)
+            }
+
+            Statement::IfStatement(if_stmt) => {
+                let condition = self.eval_expr(&if_stmt.condition, fn_env, env)?;
+
+                let branch = if let Value::Boolean(condition) = condition {
+                    if condition {
+                        Some(&if_stmt.then_branch)
+                    } else {
+                        if_stmt.else_branch.as_ref()
+                    }
+                } else {
+                    panic!("type error. If condition must be of type bool")
+                };
+
+                if let Some(branch) = branch {
+                    env.push_env();
+                    for stmt in branch {
+                        match self.eval_statement(stmt, fn_env, env)? {
+                            StatementEvalResult::Void => {}
+                            StatementEvalResult::Return(value) => {
+                                return Ok(StatementEvalResult::Return(value))
+                            }
+                        }
+                    }
+                    env.pop_env();
+                }
+
+                Ok(StatementEvalResult::Void)
             }
         }
     }
@@ -98,7 +128,7 @@ impl<'a, W: Write> Evaluator<'a, W> {
 
                 for statement in &f.body {
                     match self.eval_statement(statement, fn_env, &mut inner_env)? {
-                        StatementEvalResult::Value => {}
+                        StatementEvalResult::Void => {}
                         StatementEvalResult::Return(value) => return Ok(Some(value)),
                     }
                 }
@@ -165,12 +195,85 @@ impl<'a, W: Write> Evaluator<'a, W> {
 }
 
 enum StatementEvalResult {
-    Value,
+    Void,
     Return(Value),
 }
 
 type FnEnv<'a, W> = HashMap<&'a str, FnEnvEntry<'a, W>>;
-type LocalEnv<'a> = HashMap<&'a str, Value>;
+type LocalEnv<'a> = EnvStack<&'a str, Value>;
+
+struct EnvStack<K, V> {
+    bottom: HashMap<K, V>,
+    stack: Vec<HashMap<K, V>>,
+}
+
+impl<K: Hash + Ord + Eq, V> EnvStack<K, V> {
+    fn new() -> Self {
+        EnvStack {
+            bottom: HashMap::new(),
+            stack: Vec::new(),
+        }
+    }
+
+    fn insert(&mut self, key: K, value: V) -> Option<V> {
+        if let Some(current_value) = self.get_mut(&key) {
+            let prev = std::mem::replace(current_value, value);
+            return Some(prev);
+        }
+
+        if let Some(env) = self.stack.last_mut() {
+            env.insert(key, value)
+        } else {
+            self.bottom.insert(key, value)
+        }
+    }
+
+    fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
+    where
+        K: std::borrow::Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        for env in self.stack.iter().rev() {
+            if let Some(value) = env.get(key) {
+                return Some(value);
+            }
+        }
+        self.bottom.get(key)
+    }
+
+    fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
+    where
+        K: std::borrow::Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        for env in self.stack.iter_mut().rev() {
+            if let Some(value) = env.get_mut(key) {
+                return Some(value);
+            }
+        }
+        self.bottom.get_mut(key)
+    }
+
+    fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
+    where
+        K: std::borrow::Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        self.get(key).is_some()
+    }
+
+    fn push_env(&mut self) {
+        self.stack.push(HashMap::new())
+    }
+
+    fn pop_env(&mut self) -> Option<HashMap<K, V>> {
+        if !self.stack.is_empty() {
+            Some(self.stack.remove(self.stack.len() - 1))
+        } else {
+            None
+        }
+    }
+}
 
 type BuiltIn<'a, W> = Box<Fn(&mut W, &mut LocalEnv<'a>) -> Result<'a, Option<Value>>>;
 

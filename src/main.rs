@@ -234,4 +234,80 @@ mod test {
 
         assert_eq!(output, "first\nsecond\n");
     }
+
+    #[test]
+    fn conditional_statement() {
+        let program = r#"
+            fn main() -> Void {
+                if false {
+                    println("yep");
+                } else {
+                    println("nope");
+                }
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
+        let output = unwrap_or_panic!(String::from_utf8(output));
+
+        assert_eq!(output, "nope\n");
+    }
+
+    #[test]
+    fn optional_else_clause() {
+        let program = r#"
+            fn main() -> Void {
+                if false {
+                    println("yep");
+                }
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
+        let output = unwrap_or_panic!(String::from_utf8(output));
+
+        assert_eq!(output, "");
+    }
+
+    #[test]
+    fn if_statement_scoping_reassignment() {
+        let program = r#"
+            fn main() -> Void {
+                let a = "og";
+                if true {
+                    a = "changed";
+                }
+                println(a);
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
+        let output = unwrap_or_panic!(String::from_utf8(output));
+
+        assert_eq!(output, "changed\n");
+    }
+
+    #[test]
+    fn if_statement_scoping_new_binding_not_allowed() {
+        let program = r#"
+            fn main() -> Void {
+                if true {
+                    let a = "og";
+                }
+                println(a);
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        let result = Interpreter::new().interpret(program, &mut output);
+        match result {
+            Err(Error::UndefinedLocalVariable { .. }) => {}
+            other => {
+                panic!("Fail: {:?}", other);
+            }
+        }
+    }
 }

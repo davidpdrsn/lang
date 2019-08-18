@@ -1,7 +1,7 @@
 use crate::Rule;
-use pest::iterators::Pair;
+use pest::iterators::{Pair, Pairs};
 use pest::Span;
-use std::fmt::{self, Write};
+use std::fmt;
 
 #[derive(Debug)]
 pub struct ParseError;
@@ -34,11 +34,11 @@ trait Parse<'a>: Sized {
         if pair.as_rule() == Self::RULE {
             Self::parse_pair_of_rule(pair)
         } else {
-            let mut f = String::new();
-            writeln!(f, "Parse error").unwrap();
-            writeln!(f, "Expected {:?}", Self::RULE).unwrap();
-            writeln!(f, "Got {}", pair.as_str()).unwrap();
-            panic!("{}", f)
+            panic!(
+                "Parse error. Expected {:?} got {:?}",
+                Self::RULE,
+                pair.as_rule()
+            );
         }
     }
 }
@@ -90,7 +90,7 @@ impl<'a> Parse<'a> for Function<'a> {
         let parameters = Parameters::parse(function.next().unwrap())?;
         let _type_ = function.next().unwrap();
 
-        let body = Vec::<Statement>::parse(function.next().unwrap())?;
+        let body = parse_many::<Statement>(function.next().unwrap().into_inner())?;
 
         Ok(Function {
             name,
@@ -99,6 +99,14 @@ impl<'a> Parse<'a> for Function<'a> {
             span,
         })
     }
+}
+
+fn parse_many<'a, T: Parse<'a>>(pairs: Pairs<'a, Rule>) -> ParseResult<Vec<T>> {
+    let mut acc = vec![];
+    for pair in pairs {
+        acc.push(T::parse(pair)?);
+    }
+    Ok(acc)
 }
 
 #[derive(Debug)]
@@ -116,24 +124,13 @@ impl<'a> Parse<'a> for Parameters<'a> {
     }
 }
 
-impl<'a> Parse<'a> for Vec<Statement<'a>> {
-    const RULE: Rule = Rule::function_body;
-
-    fn parse_pair_of_rule(body: Pair<'a, Rule>) -> ParseResult<Self> {
-        let mut acc = vec![];
-        for pair in body.into_inner() {
-            acc.push(Statement::parse(pair)?);
-        }
-        Ok(acc)
-    }
-}
-
 #[derive(Debug)]
 pub enum Statement<'a> {
     Call(Call<'a>),
     Return(Return<'a>),
     VariableBinding(VariableBinding<'a>),
     ReassignVariable(ReassignVariable<'a>),
+    IfStatement(IfStatement<'a>),
 }
 
 impl<'a> Parse<'a> for Statement<'a> {
@@ -151,6 +148,7 @@ impl<'a> Parse<'a> for Statement<'a> {
             Rule::reassign_variable => {
                 Ok(Statement::ReassignVariable(ReassignVariable::parse(inner)?))
             }
+            Rule::if_statement => Ok(Statement::IfStatement(IfStatement::parse(inner)?)),
             other => panic!("statement parse error at {:?}", other),
         }
     }
@@ -171,7 +169,7 @@ impl<'a> Parse<'a> for Call<'a> {
         let mut function_call = function_call.into_inner();
 
         let name = Ident::parse(function_call.next().unwrap())?;
-        let args = Vec::<Expr>::parse(function_call.next().unwrap())?;
+        let args = parse_many::<Expr>(function_call.next().unwrap().into_inner())?;
 
         Ok(Call {
             name,
@@ -243,6 +241,37 @@ impl<'a> Parse<'a> for ReassignVariable<'a> {
 }
 
 #[derive(Debug)]
+pub struct IfStatement<'a> {
+    pub condition: Expr<'a>,
+    pub then_branch: Vec<Statement<'a>>,
+    pub else_branch: Option<Vec<Statement<'a>>>,
+    pub span: Span<'a>,
+}
+
+impl<'a> Parse<'a> for IfStatement<'a> {
+    const RULE: Rule = Rule::if_statement;
+
+    fn parse_pair_of_rule(if_stmt: Pair<'a, Rule>) -> ParseResult<Self> {
+        let span = if_stmt.as_span();
+        let mut if_stmt = if_stmt.into_inner();
+
+        let condition = Expr::parse(if_stmt.next().unwrap())?;
+        let then_branch = parse_many::<Statement>(if_stmt.next().unwrap().into_inner())?;
+        let else_branch = if_stmt
+            .next()
+            .map(|pair| parse_many::<Statement>(pair.into_inner()))
+            .transpose()?;
+
+        Ok(IfStatement {
+            condition,
+            then_branch,
+            else_branch,
+            span,
+        })
+    }
+}
+
+#[derive(Debug)]
 pub enum Expr<'a> {
     StringLit(StringLit<'a>),
     IntegerLit(IntegerLit<'a>),
@@ -250,18 +279,6 @@ pub enum Expr<'a> {
     ListLit(ListLit<'a>),
     LocalVariable(LocalVariable<'a>),
     Call(Call<'a>),
-}
-
-impl<'a> Parse<'a> for Vec<Expr<'a>> {
-    const RULE: Rule = Rule::arguments;
-
-    fn parse_pair_of_rule(exprs: Pair<'a, Rule>) -> ParseResult<Self> {
-        let mut acc = vec![];
-        for pair in exprs.into_inner() {
-            acc.push(Expr::parse(pair)?);
-        }
-        Ok(acc)
-    }
 }
 
 impl<'a> Parse<'a> for Expr<'a> {
@@ -386,17 +403,5 @@ impl<'a> Parse<'a> for Ident<'a> {
         let span = pair.as_span();
         let name = span.as_str();
         Ok(Ident { name, span })
-    }
-}
-
-impl<'a> Parse<'a> for Vec<Ident<'a>> {
-    const RULE: Rule = Rule::identifier;
-
-    fn parse_pair_of_rule(exprs: Pair<'a, Rule>) -> ParseResult<Self> {
-        let mut acc = vec![];
-        for pair in exprs.into_inner() {
-            acc.push(Ident::parse(pair)?);
-        }
-        Ok(acc)
     }
 }
