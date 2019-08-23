@@ -1,9 +1,9 @@
-use crate::ast::*;
-use crate::error::{Error, Result};
+use crate::{
+    ast::*,
+    error::{Error, Result},
+};
 use pest::Span;
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::io::Write;
+use std::{collections::HashMap, hash::Hash, io::Write};
 
 pub struct Evaluator<'a, W> {
     stdout: &'a mut W,
@@ -39,7 +39,8 @@ impl<'a, W: Write> Evaluator<'a, W> {
             }
 
             Statement::Return(return_statement) => {
-                let value = self.eval_expr(&return_statement.expr, fn_env, env)?;
+                let value =
+                    self.eval_expr(&return_statement.expr, fn_env, env)?;
                 Ok(StatementEvalResult::Return(value))
             }
 
@@ -66,7 +67,8 @@ impl<'a, W: Write> Evaluator<'a, W> {
             }
 
             Statement::IfStatement(if_stmt) => {
-                let condition = self.eval_expr(&if_stmt.condition, fn_env, env)?;
+                let condition =
+                    self.eval_expr(&if_stmt.condition, fn_env, env)?;
 
                 let branch = if let Value::Boolean(condition) = condition {
                     if condition {
@@ -75,7 +77,7 @@ impl<'a, W: Write> Evaluator<'a, W> {
                         if_stmt.else_branch.as_ref()
                     }
                 } else {
-                    panic!("type error. If condition must be of type bool")
+                    unreachable!("type error in eval (IfStatement)")
                 };
 
                 if let Some(branch) = branch {
@@ -105,31 +107,36 @@ impl<'a, W: Write> Evaluator<'a, W> {
         let span = call.span.clone();
         let name_to_call = call.name.name;
 
-        let function = fn_env
-            .get(name_to_call)
-            .ok_or_else(|| Error::UndefinedFunction(name_to_call.to_string(), call.span.clone()))?;
+        let function = fn_env.get(name_to_call).ok_or_else(|| {
+            Error::UndefinedFunction(
+                name_to_call.to_string(),
+                call.span.clone(),
+            )
+        })?;
 
         match function {
             FnEnvEntry::Function(f) => {
                 let mut inner_env = LocalEnv::new();
 
                 if f.parameters.0.len() != call.args.len() {
-                    return Err(Error::WrongNumberOfArguments {
-                        expected: f.parameters.0.len(),
-                        got: call.args.len(),
-                        span,
-                    });
+                    unreachable!("type error in eval (eval_call)")
                 }
 
                 for (param, arg) in f.parameters.0.iter().zip(&call.args) {
                     let value = self.eval_expr(arg, fn_env, env)?;
-                    inner_env.insert(param.name, value);
+                    inner_env.insert(param.0.name, value);
                 }
 
                 for statement in &f.body {
-                    match self.eval_statement(statement, fn_env, &mut inner_env)? {
+                    match self.eval_statement(
+                        statement,
+                        fn_env,
+                        &mut inner_env,
+                    )? {
                         StatementEvalResult::Void => {}
-                        StatementEvalResult::Return(value) => return Ok(Some(value)),
+                        StatementEvalResult::Return(value) => {
+                            return Ok(Some(value))
+                        }
                     }
                 }
                 Ok(None)
@@ -179,7 +186,10 @@ impl<'a, W: Write> Evaluator<'a, W> {
             Expr::LocalVariable(ident) => {
                 let name = &ident.name.name;
                 let value = env.get(name).ok_or_else(|| {
-                    Error::UndefinedLocalVariable(name.to_string(), ident.span.clone())
+                    Error::UndefinedLocalVariable(
+                        name.to_string(),
+                        ident.span.clone(),
+                    )
                 })?;
                 Ok(value.clone())
             }
@@ -202,20 +212,20 @@ enum StatementEvalResult {
 type FnEnv<'a, W> = HashMap<&'a str, FnEnvEntry<'a, W>>;
 type LocalEnv<'a> = EnvStack<&'a str, Value>;
 
-struct EnvStack<K, V> {
+pub struct EnvStack<K, V> {
     bottom: HashMap<K, V>,
     stack: Vec<HashMap<K, V>>,
 }
 
 impl<K: Hash + Ord + Eq, V> EnvStack<K, V> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         EnvStack {
             bottom: HashMap::new(),
             stack: Vec::new(),
         }
     }
 
-    fn insert(&mut self, key: K, value: V) -> Option<V> {
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         if let Some(current_value) = self.get_mut(&key) {
             let prev = std::mem::replace(current_value, value);
             return Some(prev);
@@ -228,7 +238,7 @@ impl<K: Hash + Ord + Eq, V> EnvStack<K, V> {
         }
     }
 
-    fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
+    pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
     where
         K: std::borrow::Borrow<Q>,
         Q: Hash + Eq,
@@ -241,7 +251,7 @@ impl<K: Hash + Ord + Eq, V> EnvStack<K, V> {
         self.bottom.get(key)
     }
 
-    fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
+    pub fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
     where
         K: std::borrow::Borrow<Q>,
         Q: Hash + Eq,
@@ -254,7 +264,7 @@ impl<K: Hash + Ord + Eq, V> EnvStack<K, V> {
         self.bottom.get_mut(key)
     }
 
-    fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
+    pub fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
     where
         K: std::borrow::Borrow<Q>,
         Q: Hash + Eq,
@@ -262,11 +272,11 @@ impl<K: Hash + Ord + Eq, V> EnvStack<K, V> {
         self.get(key).is_some()
     }
 
-    fn push_env(&mut self) {
+    pub fn push_env(&mut self) {
         self.stack.push(HashMap::new())
     }
 
-    fn pop_env(&mut self) -> Option<HashMap<K, V>> {
+    pub fn pop_env(&mut self) -> Option<HashMap<K, V>> {
         if !self.stack.is_empty() {
             Some(self.stack.remove(self.stack.len() - 1))
         } else {
@@ -275,7 +285,8 @@ impl<K: Hash + Ord + Eq, V> EnvStack<K, V> {
     }
 }
 
-type BuiltIn<'a, W> = Box<Fn(&mut W, &mut LocalEnv<'a>) -> Result<'a, Option<Value>>>;
+type BuiltIn<'a, W> =
+    Box<Fn(&mut W, &mut LocalEnv<'a>) -> Result<'a, Option<Value>>>;
 
 enum FnEnvEntry<'a, W> {
     Function(Function<'a>),
@@ -328,7 +339,7 @@ fn int_to_string_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
             let string = format!("{}", i);
             Ok(Some(Value::String(string)))
         } else {
-            unimplemented!("type error")
+            unreachable!("type error in eval (int_to_string)")
         }
     })
 }
@@ -343,7 +354,7 @@ fn bool_to_string_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
             let string = format!("{}", i);
             Ok(Some(Value::String(string)))
         } else {
-            unimplemented!("type error")
+            unreachable!("type error in eval (bool_to_string)")
         }
     })
 }
@@ -357,7 +368,7 @@ fn length_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
         if let Value::List(list) = input {
             Ok(Some(Value::Integer(list.len() as i32)))
         } else {
-            unimplemented!("type error")
+            unreachable!("type error in eval (bool_to_string)")
         }
     })
 }

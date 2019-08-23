@@ -1,5 +1,7 @@
-use crate::ast::ParseError;
-use crate::Rule;
+use crate::{
+    ast::{ParseError, Type},
+    Rule,
+};
 use pest::Span;
 use std::fmt;
 
@@ -14,6 +16,11 @@ pub enum Error<'a> {
     WrongNumberOfArguments {
         expected: usize,
         got: usize,
+        span: Span<'a>,
+    },
+    TypeError {
+        expected: Type,
+        got: Type,
         span: Span<'a>,
     },
 }
@@ -44,7 +51,11 @@ impl<'a> fmt::Display for Error<'a> {
             }
             UndefinedLocalVariable(name, span) => {
                 let (line, col) = span.start_pos().line_col();
-                write!(f, "Undefined local variable `{}` at {}:{}", name, line, col,)?;
+                write!(
+                    f,
+                    "Undefined local variable `{}` at {}:{}",
+                    name, line, col,
+                )?;
                 Ok(())
             }
             WrongNumberOfArguments {
@@ -56,6 +67,18 @@ impl<'a> fmt::Display for Error<'a> {
                 write!(
                     f,
                     "Wrong number of arguments at {}:{}. Expected {} got {}",
+                    line, col, expected, got
+                )
+            }
+            TypeError {
+                expected,
+                got,
+                span,
+            } => {
+                let (line, col) = span.start_pos().line_col();
+                write!(
+                    f,
+                    "Type error at {}:{}. Expected {} got {}",
                     line, col, expected, got
                 )
             }

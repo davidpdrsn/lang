@@ -7,7 +7,7 @@ function = {
   "fn"
   ~ identifier
   ~ "(" ~ parameters ~ ")"
-  ~ "->" ~ type_
+  ~ ("->" ~ type_)?
   ~ "{" ~ function_body ~ "}"
 }
 function_body = { statement* }
@@ -33,7 +33,7 @@ if_statement = {
 }
 if_statement_body = { statement* }
 
-parameters = { ((identifier ~ ","?) ~ ","?)* }
+parameters = { ((identifier ~ ":" ~ type_ ~ ","?) ~ ","?)* }
 arguments = { ((expression ~ ","?) ~ ","?)* }
 
 expression = {

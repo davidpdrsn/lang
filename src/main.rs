@@ -11,14 +11,14 @@ extern crate pest_derive;
 mod ast;
 mod error;
 mod eval;
+mod type_checker;
 
 use error::Error;
 use eval::Evaluator;
 use pest::Parser;
-use std::fs;
-use std::io;
-use std::path::PathBuf;
+use std::{fs, io, path::PathBuf};
 use structopt::StructOpt;
+use type_checker::TypeChecker;
 
 /// Lang interpreter
 #[derive(StructOpt, Debug)]
@@ -69,6 +69,7 @@ impl Interpreter {
         let mut pairs = Tokenizer::parse(Rule::program, program)?;
         let pair = pairs.next().unwrap();
         let ast = ast::Parser::parse(pair)?;
+        TypeChecker::new().check(&ast)?;
         Evaluator::evaluate(ast, stdout)?;
 
         Ok(())
@@ -91,7 +92,7 @@ mod test {
 
     #[test]
     fn do_nothing() {
-        let program = "fn main() -> Void {}";
+        let program = "fn main() {}";
 
         let mut output = Vec::<u8>::new();
         Interpreter::new().interpret(program, &mut output).unwrap();
@@ -102,7 +103,7 @@ mod test {
 
     #[test]
     fn hello_world() {
-        let program = "fn main() -> Void { println(\"Hello, World!\"); }";
+        let program = "fn main() { println(\"Hello, World!\"); }";
 
         let mut output = Vec::<u8>::new();
         Interpreter::new().interpret(program, &mut output).unwrap();
@@ -114,11 +115,11 @@ mod test {
     #[test]
     fn calling_other_functions() {
         let program = r#"
-            fn main() -> Void {
+            fn main() {
                 foo("a", "b");
             }
 
-            fn foo(a, b) -> Void {
+            fn foo(a: String, b: String) {
                 println(a);
                 println(b);
             }
@@ -134,15 +135,15 @@ mod test {
     #[test]
     fn returning_values() {
         let program = r#"
-            fn main() -> Void {
+            fn main() {
                 print_it(id("hi"));
             }
 
-            fn print_it(a) -> Void {
+            fn print_it(a: String) {
                 println(a);
             }
 
-            fn id(a) -> String {
+            fn id(a: String) -> String {
                 return a;
             }
         "#;
@@ -157,7 +158,7 @@ mod test {
     #[test]
     fn variable_bindings() {
         let program = r#"
-            fn main() -> Void {
+            fn main() {
                 let a = "hi";
                 println(a);
             }
@@ -173,7 +174,7 @@ mod test {
     #[test]
     fn integers() {
         let program = r#"
-            fn main() -> Void {
+            fn main() {
                 println(int_to_string(1));
             }
         "#;
@@ -188,7 +189,7 @@ mod test {
     #[test]
     fn bools() {
         let program = r#"
-            fn main() -> Void {
+            fn main() {
                 println(bool_to_string(true));
                 println(bool_to_string(false));
             }
@@ -204,7 +205,7 @@ mod test {
     #[test]
     fn lists() {
         let program = r#"
-            fn main() -> Void {
+            fn main() {
                 let list = [1, 2, 3];
                 println(int_to_string(length(list)));
             }
@@ -220,7 +221,7 @@ mod test {
     #[test]
     fn reassign() {
         let program = r#"
-            fn main() -> Void {
+            fn main() {
                 let a = "first";
                 println(a);
                 a = "second";
@@ -238,7 +239,7 @@ mod test {
     #[test]
     fn conditional_statement() {
         let program = r#"
-            fn main() -> Void {
+            fn main() {
                 if false {
                     println("yep");
                 } else {
@@ -257,7 +258,7 @@ mod test {
     #[test]
     fn optional_else_clause() {
         let program = r#"
-            fn main() -> Void {
+            fn main() {
                 if false {
                     println("yep");
                 }
@@ -274,7 +275,7 @@ mod test {
     #[test]
     fn if_statement_scoping_reassignment() {
         let program = r#"
-            fn main() -> Void {
+            fn main() {
                 let a = "og";
                 if true {
                     a = "changed";
@@ -293,7 +294,7 @@ mod test {
     #[test]
     fn if_statement_scoping_new_binding_not_allowed() {
         let program = r#"
-            fn main() -> Void {
+            fn main() {
                 if true {
                     let a = "og";
                 }

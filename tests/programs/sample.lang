@@ -1,8 +1,8 @@
-fn main() -> Void {
+fn main() {
     foo("hi", "ho");
 }
 
-fn foo(a, b) -> Void {
+fn foo(a: String, b: String) {
     println(a);
     println(b);
 }
