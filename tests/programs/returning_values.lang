@@ -1,0 +1,11 @@
+fn main() {
+    print_it(id("hi"));
+}
+
+fn print_it(a: String) {
+    println(a);
+}
+
+fn id(a: String) -> String {
+    return a;
+}

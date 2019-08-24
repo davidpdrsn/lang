@@ -1,0 +1,4 @@
+fn main() {
+    let list: [Integer] = [];
+    println(length(list));
+}

@@ -1,0 +1,7 @@
+fn main() {
+    let a = "og";
+    if true {
+        a = "changed";
+    }
+    println(a);
+}

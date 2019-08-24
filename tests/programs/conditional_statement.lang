@@ -1,0 +1,7 @@
+fn main() {
+    if false {
+        println("yep");
+    } else {
+        println("nope");
+    }
+}

@@ -1,0 +1,8 @@
+fn main() {
+    let l = foo([]);
+    println(l);
+}
+
+fn foo(as: [Integer]) -> Integer {
+    return length(as);
+}

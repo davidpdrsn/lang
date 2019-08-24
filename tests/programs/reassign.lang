@@ -1,0 +1,6 @@
+fn main() {
+    let a = "first";
+    println(a);
+    a = "second";
+    println(a);
+}

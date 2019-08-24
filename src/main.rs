@@ -8,11 +8,11 @@
 #[macro_use]
 extern crate pest_derive;
 
-mod utils;
 mod ast;
 mod error;
 mod eval;
 mod type_checker;
+mod utils;
 
 use error::Error;
 use eval::Evaluator;
@@ -82,250 +82,52 @@ mod test {
     #[allow(unused_imports)]
     use super::*;
 
-    macro_rules! unwrap_or_panic {
-        ($expr:expr) => {
-            match $expr {
-                Ok(x) => x,
-                Err(e) => panic!("{}", e),
-            }
-        };
+    #[test]
+    fn test_files() {
+        let files = test_program_files().unwrap();
+        dbg!(&files);
+
+        for (source_file, stdout_file) in files {
+            dbg!(&source_file);
+            dbg!(&stdout_file);
+
+            let code = std::fs::read_to_string(&source_file).unwrap();
+
+            let mut output = Vec::<u8>::new();
+            Interpreter::new().interpret(&code, &mut output).unwrap();
+            let output = String::from_utf8(output).unwrap();
+
+            let expected_output = std::fs::read_to_string(&stdout_file).unwrap();
+            assert_eq!(output, expected_output);
+        }
     }
 
-    #[test]
-    fn do_nothing() {
-        let program = "fn main() {}";
+    fn test_program_files() -> std::io::Result<Vec<(String, String)>> {
+        let mut source_files = vec![];
+        let mut stdout_files = vec![];
 
-        let mut output = Vec::<u8>::new();
-        Interpreter::new().interpret(program, &mut output).unwrap();
-        let output = String::from_utf8(output).unwrap();
+        for entry in fs::read_dir("tests/programs")? {
+            let dir = entry?;
+            let file_name = dir.path().display().to_string();
 
-        assert_eq!(output, "");
-    }
-
-    #[test]
-    fn hello_world() {
-        let program = "fn main() { println(\"Hello, World!\"); }";
-
-        let mut output = Vec::<u8>::new();
-        Interpreter::new().interpret(program, &mut output).unwrap();
-        let output = String::from_utf8(output).unwrap();
-
-        assert_eq!(output, "Hello, World!\n");
-    }
-
-    #[test]
-    fn calling_other_functions() {
-        let program = r#"
-            fn main() {
-                foo("a", "b");
+            if file_name.ends_with(".stdout") {
+                stdout_files.push(file_name);
+            } else {
+                source_files.push(file_name);
             }
+        }
 
-            fn foo(a: String, b: String) {
-                println(a);
-                println(b);
-            }
-        "#;
+        source_files.sort();
+        stdout_files.sort();
 
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
+        assert_eq!(source_files.len(), stdout_files.len());
 
-        assert_eq!(output, "a\nb\n");
-    }
+        let files = source_files
+            .into_iter()
+            .zip(stdout_files.into_iter())
+            .collect::<Vec<_>>();
 
-    #[test]
-    fn returning_values() {
-        let program = r#"
-            fn main() {
-                print_it(id("hi"));
-            }
-
-            fn print_it(a: String) {
-                println(a);
-            }
-
-            fn id(a: String) -> String {
-                return a;
-            }
-        "#;
-
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
-
-        assert_eq!(output, "hi\n");
-    }
-
-    #[test]
-    fn variable_bindings() {
-        let program = r#"
-            fn main() {
-                let a = "hi";
-                println(a);
-            }
-        "#;
-
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
-
-        assert_eq!(output, "hi\n");
-    }
-
-    #[test]
-    fn integers() {
-        let program = r#"
-            fn main() {
-                println(1);
-            }
-        "#;
-
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
-
-        assert_eq!(output, "1\n");
-    }
-
-    #[test]
-    fn bools() {
-        let program = r#"
-            fn main() {
-                println(true);
-                println(false);
-            }
-        "#;
-
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
-
-        assert_eq!(output, "true\nfalse\n");
-    }
-
-    #[test]
-    fn lists() {
-        let program = r#"
-            fn main() {
-                let list = [1, 2, 3];
-                println(length(list));
-            }
-        "#;
-
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
-
-        assert_eq!(output, "3\n");
-    }
-
-    #[test]
-    fn empty_list() {
-        let program = r#"
-            fn main() {
-                let list: [Integer] = [];
-                println(length(list));
-            }
-        "#;
-
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
-
-        assert_eq!(output, "0\n");
-    }
-
-    #[test]
-    fn empty_list_as_arg() {
-        let program = r#"
-            fn main() {
-                let l = foo([]);
-                println(l);
-            }
-
-            fn foo(as: [Integer]) -> Integer {
-                return length(as);
-            }
-        "#;
-
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
-
-        assert_eq!(output, "0\n");
-    }
-
-    #[test]
-    fn reassign() {
-        let program = r#"
-            fn main() {
-                let a = "first";
-                println(a);
-                a = "second";
-                println(a);
-            }
-        "#;
-
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
-
-        assert_eq!(output, "first\nsecond\n");
-    }
-
-    #[test]
-    fn conditional_statement() {
-        let program = r#"
-            fn main() {
-                if false {
-                    println("yep");
-                } else {
-                    println("nope");
-                }
-            }
-        "#;
-
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
-
-        assert_eq!(output, "nope\n");
-    }
-
-    #[test]
-    fn optional_else_clause() {
-        let program = r#"
-            fn main() {
-                if false {
-                    println("yep");
-                }
-            }
-        "#;
-
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
-
-        assert_eq!(output, "");
-    }
-
-    #[test]
-    fn if_statement_scoping_reassignment() {
-        let program = r#"
-            fn main() {
-                let a = "og";
-                if true {
-                    a = "changed";
-                }
-                println(a);
-            }
-        "#;
-
-        let mut output = Vec::<u8>::new();
-        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
-        let output = unwrap_or_panic!(String::from_utf8(output));
-
-        assert_eq!(output, "changed\n");
+        Ok(files)
     }
 
     #[test]
