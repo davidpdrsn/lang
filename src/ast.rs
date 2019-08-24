@@ -78,7 +78,6 @@ pub enum Type {
     Boolean,
     Integer,
     String,
-    Void,
     List(Box<Type>),
 }
 
@@ -87,7 +86,6 @@ impl PartialEq for Type {
         use Type::*;
 
         match (self, other) {
-            (Void, Void) => true,
             (Integer, Integer) => true,
             (Boolean, Boolean) => true,
             (String, String) => true,
@@ -103,7 +101,6 @@ impl fmt::Display for Type {
             Type::Boolean => write!(f, "Bool"),
             Type::Integer => write!(f, "Integer"),
             Type::String => write!(f, "String"),
-            Type::Void => write!(f, "Void"),
             Type::List(inner) => write!(f, "[{}]", inner),
         }
     }
@@ -143,7 +140,7 @@ pub struct Function<'a> {
     pub name: Ident<'a>,
     pub parameters: Parameters<'a>,
     pub body: Vec<Statement<'a>>,
-    pub return_type: Type,
+    pub return_type: Option<Type>,
     pub span: Span<'a>,
 }
 
@@ -163,13 +160,13 @@ impl<'a> Parse<'a> for Function<'a> {
         let body;
         match next.as_rule() {
             Rule::type_ => {
-                return_type = Type::parse(next)?;
+                return_type = Some(Type::parse(next)?);
                 body = parse_many::<Statement>(
                     function.next().unwrap().into_inner(),
                 )?;
             }
             Rule::function_body => {
-                return_type = Type::Void;
+                return_type = None;
                 body = parse_many::<Statement>(next.into_inner())?;
             }
             _ => unreachable!(),

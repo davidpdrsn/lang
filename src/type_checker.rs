@@ -46,7 +46,7 @@ fn check_function<'a>(
 fn check_statements<'a>(
     stmts: &[Statement<'a>],
     fn_env: &FnEnv<'a>,
-    return_type: &Type,
+    return_type: &Option<Type>,
     env: &mut Env<'a>,
 ) -> Result<'a, ()> {
     for stmt in stmts {
@@ -59,7 +59,7 @@ fn check_statements<'a>(
 fn check_statement<'a>(
     stmt: &Statement<'a>,
     fn_env: &FnEnv<'a>,
-    return_type: &Type,
+    return_type: &Option<Type>,
     env: &mut Env<'a>,
 ) -> Result<'a, ()> {
     match stmt {
@@ -68,26 +68,27 @@ fn check_statement<'a>(
         }
 
         Statement::Return(inner) => {
-            let type_ = check_expr(
-                &inner.expr,
-                &Some(return_type.clone()),
-                fn_env,
-                &env,
-            )?;
+            let type_ = check_expr(&inner.expr, &return_type, fn_env, &env)
+                .not_void(&inner.span)?;
 
-            if &type_ != return_type {
-                Err(Error::TypeError {
-                    expected: type_.clone(),
-                    got: return_type.clone(),
-                    span: inner.span.clone(),
-                })?;
+            if let Some(return_type) = return_type {
+                if &type_ != return_type {
+                    Err(Error::TypeError {
+                        expected: type_.clone(),
+                        got: return_type.clone(),
+                        span: inner.span.clone(),
+                    })?;
+                }
+            } else {
+                Err(Error::ReturnFromVoidFunction(inner.span.clone()))?;
             }
         }
 
         Statement::VariableBinding(binding) => {
             let name = &binding.name.name;
             let type_hint = &binding.type_;
-            let type_ = check_expr(&binding.expr, type_hint, fn_env, &env)?;
+            let type_ = check_expr(&binding.expr, type_hint, fn_env, &env)
+                .not_void(&binding.span)?;
             env.insert(name, type_);
         }
 
@@ -108,7 +109,8 @@ fn check_statement<'a>(
                 &Some(prev_type.clone()),
                 fn_env,
                 &env,
-            )?;
+            )
+            .not_void(&binding.span)?;
 
             if &type_ != prev_type {
                 Err(Error::TypeError {
@@ -123,7 +125,8 @@ fn check_statement<'a>(
             let condition = &if_stmt.condition;
 
             // TODO: What would a type hint here do?
-            let cond_type = check_expr(condition, &None, fn_env, &env)?;
+            let cond_type = check_expr(condition, &None, fn_env, &env)
+                .not_void(&if_stmt.span)?;
 
             if cond_type != Type::Boolean {
                 Err(Error::TypeError {
@@ -150,7 +153,7 @@ fn check_statement<'a>(
 
 fn inner_type(type_: &Type) -> Option<Type> {
     match type_ {
-        Type::Boolean | Type::String | Type::Integer | Type::Void => None,
+        Type::Boolean | Type::String | Type::Integer => None,
         Type::List(inner) => Some(inner.as_ref().clone()),
     }
 }
@@ -160,33 +163,40 @@ fn check_expr<'a>(
     hint: &Option<Type>,
     fn_env: &FnEnv<'a>,
     env: &Env<'a>,
-) -> Result<'a, Type> {
+) -> Result<'a, Option<Type>> {
     match expr {
-        Expr::StringLit(_) => Ok(Type::String),
-        Expr::IntegerLit(_) => Ok(Type::Integer),
-        Expr::BooleanLit(_) => Ok(Type::Boolean),
+        Expr::StringLit(_) => Ok(Some(Type::String)),
+        Expr::IntegerLit(_) => Ok(Some(Type::Integer)),
+        Expr::BooleanLit(_) => Ok(Some(Type::Boolean)),
 
         Expr::ListLit(list) => {
+            let span = list.span.clone();
+
             if list.elements.is_empty() {
                 let type_ = if let Some(type_) = hint.as_ref() {
                     type_
                 } else {
-                    let span = list.span.clone();
                     return Err(Error::CannotInferType(span));
                 };
-                Ok(type_.clone())
+                Ok(Some(type_.clone()))
             } else if list.elements.len() == 1 {
                 let inner_type = hint.as_ref().and_then(|h| inner_type(&h));
+
                 let first =
-                    check_expr(&list.elements[0], &inner_type, fn_env, env)?;
-                Ok(Type::List(Box::new(first)))
+                    check_expr(&list.elements[0], &inner_type, fn_env, env)
+                        .not_void(&span)?;
+
+                Ok(Some(Type::List(Box::new(first))))
             } else {
                 let inner_type = hint.as_ref().and_then(|h| inner_type(&h));
                 let first =
-                    check_expr(&list.elements[0], &inner_type, fn_env, env)?;
+                    check_expr(&list.elements[0], &inner_type, fn_env, env)
+                        .not_void(&span)?;
 
                 for element in &list.elements[1..] {
-                    let other = check_expr(element, &inner_type, fn_env, env)?;
+                    let other = check_expr(element, &inner_type, fn_env, env)
+                        .not_void(&span)?;
+
                     if first != other {
                         Err(Error::TypeError {
                             expected: first.clone(),
@@ -196,7 +206,7 @@ fn check_expr<'a>(
                     }
                 }
 
-                Ok(Type::List(Box::new(first)))
+                Ok(Some(Type::List(Box::new(first))))
             }
         }
 
@@ -204,7 +214,7 @@ fn check_expr<'a>(
             let name = &ident.name.name;
 
             if let Some(value) = env.get(name) {
-                Ok(value.clone())
+                Ok(Some(value.clone()))
             } else {
                 Err(Error::UndefinedLocalVariable(
                     name.to_string(),
@@ -221,7 +231,7 @@ fn check_call<'a>(
     call: &Call<'a>,
     fn_env: &FnEnv<'a>,
     env: &Env<'a>,
-) -> Result<'a, Type> {
+) -> Result<'a, Option<Type>> {
     let span = call.span.clone();
     let name_to_call = call.name.name;
 
@@ -240,7 +250,8 @@ fn check_call<'a>(
     for (required_type, expr) in function_type.arg_types.iter().zip(&call.args)
     {
         let type_ =
-            check_expr(expr, &Some(required_type.clone()), fn_env, &env)?;
+            check_expr(expr, &Some(required_type.clone()), fn_env, &env)
+                .not_void(&span)?;
 
         if required_type != &type_ {
             Err(Error::TypeError {
@@ -257,7 +268,7 @@ fn check_call<'a>(
 #[derive(Debug)]
 struct FunctionType {
     arg_types: Vec<Type>,
-    return_type: Type,
+    return_type: Option<Type>,
 }
 
 fn build_fn_env<'a>(program: &Program<'a>) -> FnEnv<'a> {
@@ -284,7 +295,7 @@ fn build_fn_env<'a>(program: &Program<'a>) -> FnEnv<'a> {
         "println",
         FunctionType {
             arg_types: vec![Type::String],
-            return_type: Type::Void,
+            return_type: None,
         },
     );
 
@@ -292,7 +303,7 @@ fn build_fn_env<'a>(program: &Program<'a>) -> FnEnv<'a> {
         "int_to_string",
         FunctionType {
             arg_types: vec![Type::Integer],
-            return_type: Type::String,
+            return_type: Some(Type::String),
         },
     );
 
@@ -300,7 +311,7 @@ fn build_fn_env<'a>(program: &Program<'a>) -> FnEnv<'a> {
         "bool_to_string",
         FunctionType {
             arg_types: vec![Type::Boolean],
-            return_type: Type::String,
+            return_type: Some(Type::String),
         },
     );
 
@@ -309,7 +320,7 @@ fn build_fn_env<'a>(program: &Program<'a>) -> FnEnv<'a> {
         FunctionType {
             // TODO: Make this work for any list type
             arg_types: vec![Type::List(Box::new(Type::Integer))],
-            return_type: Type::Integer,
+            return_type: Some(Type::Integer),
         },
     );
 
@@ -324,5 +335,19 @@ fn main_call(span: Span) -> Call {
         },
         args: vec![],
         span: span.clone(),
+    }
+}
+
+trait NotVoid<'a> {
+    fn not_void(self, span: &Span<'a>) -> Result<'a, Type>;
+}
+
+impl<'a> NotVoid<'a> for Result<'a, Option<Type>> {
+    fn not_void(self, span: &Span<'a>) -> Result<'a, Type> {
+        match self {
+            Err(e) => Err(e),
+            Ok(Some(t)) => Ok(t),
+            Ok(None) => Err(Error::VoidTypeUsed(span.clone())),
+        }
     }
 }

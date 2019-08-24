@@ -24,6 +24,8 @@ pub enum Error<'a> {
         span: Span<'a>,
     },
     CannotInferType(Span<'a>),
+    ReturnFromVoidFunction(Span<'a>),
+    VoidTypeUsed(Span<'a>),
 }
 
 impl<'a> From<pest::error::Error<Rule>> for Error<'a> {
@@ -88,6 +90,22 @@ impl<'a> fmt::Display for Error<'a> {
                 write!(
                     f,
                     "Type error at {}:{}. The type cannot be inferred. Add type annotation",
+                    line, col
+                )
+            }
+            ReturnFromVoidFunction(span) => {
+                let (line, col) = span.start_pos().line_col();
+                write!(
+                    f,
+                    "Type error at {}:{}. You cannot return from functions without a return type",
+                    line, col
+                )
+            }
+            VoidTypeUsed(span) => {
+                let (line, col) = span.start_pos().line_col();
+                write!(
+                    f,
+                    "Type error at {}:{}. Expressions without a type cannot be used in other statements or expressions",
                     line, col
                 )
             }
