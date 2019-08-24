@@ -1,13 +1,18 @@
 use crate::{
-    utils::{Stack, EnvStack},
     ast::*,
     error::{Error, Result},
+    utils::{EnvStack, LineAndCol, Stack},
 };
 use pest::Span;
-use std::{collections::HashMap, hash::Hash, io::Write};
+use std::{collections::HashMap, hash::Hash, io::Write, fmt};
+
+type FnEnv<'a, W> = HashMap<&'a str, FnEnvEntry<'a, W>>;
+type LocalEnv<'a> = EnvStack<&'a str, Value>;
+pub type CallStack<'a> = Stack<StackFrame<'a>>;
 
 pub struct Evaluator<'a, W> {
     stdout: &'a mut W,
+    call_stack: CallStack<'a>,
 }
 
 impl<'a, W: Write> Evaluator<'a, W> {
@@ -17,14 +22,21 @@ impl<'a, W: Write> Evaluator<'a, W> {
         let fn_env = build_fn_env(program);
         let call = main_call(span);
 
-        let env = LocalEnv::new();
-        Evaluator::new(stdout).eval_call(&call, &fn_env, &env)?;
-
-        Ok(())
+        let mut eval = Evaluator::new(stdout);
+        let result = eval.eval_call(&call, &fn_env, &LocalEnv::new());
+        match result {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                Err(Error::WithCallStack(eval.call_stack, Box::new(error)))
+            }
+        }
     }
 
     fn new(stdout: &'a mut W) -> Self {
-        Evaluator { stdout }
+        Evaluator {
+            stdout,
+            call_stack: CallStack::new(),
+        }
     }
 
     fn eval_statement(
@@ -115,7 +127,12 @@ impl<'a, W: Write> Evaluator<'a, W> {
             )
         })?;
 
-        match function {
+        self.call_stack.push(StackFrame {
+            fn_name: name_to_call,
+            span: span.clone(),
+        });
+
+        let result = match function {
             FnEnvEntry::Function(f) => {
                 let mut inner_env = LocalEnv::new();
 
@@ -160,7 +177,11 @@ impl<'a, W: Write> Evaluator<'a, W> {
 
                 f(&mut self.stdout, &mut inner_env)
             }
-        }
+        };
+
+        self.call_stack.pop();
+
+        result
     }
 
     fn eval_expr(
@@ -209,9 +230,6 @@ enum StatementEvalResult {
     Void,
     Return(Value),
 }
-
-type FnEnv<'a, W> = HashMap<&'a str, FnEnvEntry<'a, W>>;
-type LocalEnv<'a> = EnvStack<&'a str, Value>;
 
 type BuiltIn<'a, W> =
     Box<Fn(&mut W, &mut LocalEnv<'a>) -> Result<'a, Option<Value>>>;
@@ -318,4 +336,17 @@ enum Value {
     Integer(i32),
     Boolean(bool),
     List(Vec<Value>),
+}
+
+#[derive(Debug)]
+pub struct StackFrame<'a> {
+    fn_name: &'a str,
+    span: Span<'a>,
+}
+
+impl<'a> fmt::Display for StackFrame<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (line, col) = self.span.line_and_col();
+        write!(f, "{} {}:{}", self.fn_name, line, col)
+    }
 }

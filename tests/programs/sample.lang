@@ -1,8 +1,12 @@
 fn main() {
-    foo("hi", "ho");
+    let a = true;
+    foo(a);
 }
 
-fn foo(a: String, b: String) {
-    println(a);
-    println(b);
+fn foo(param: Boolean) {
+    if param {
+        println("yes");
+    } else {
+        println("no");
+    }
 }

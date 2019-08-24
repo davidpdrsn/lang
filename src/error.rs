@@ -1,5 +1,7 @@
 use crate::{
     ast::{ParseError, Type},
+    eval::CallStack,
+    utils::LineAndCol,
     Rule,
 };
 use pest::Span;
@@ -9,6 +11,7 @@ pub type Result<'a, T> = std::result::Result<T, Error<'a>>;
 
 #[derive(Debug)]
 pub enum Error<'a> {
+    WithCallStack(CallStack<'a>, Box<Error<'a>>),
     TokenizeError(pest::error::Error<Rule>),
     ParseError(ParseError),
     UndefinedFunction(String, Span<'a>),
@@ -45,15 +48,21 @@ impl<'a> fmt::Display for Error<'a> {
         use Error::*;
 
         match self {
+            WithCallStack(stack, error) => {
+                for frame in stack {
+                    writeln!(f, "{}", frame)?;
+                }
+                write!(f, "{}", error)
+            }
             TokenizeError(inner) => write!(f, "{}", inner),
             ParseError(inner) => write!(f, "{}", inner),
             UndefinedFunction(name, span) => {
-                let (line, col) = span.start_pos().line_col();
+                let (line, col) = span.line_and_col();
                 write!(f, "Undefined function `{}` at {}:{}", name, line, col,)?;
                 Ok(())
             }
             UndefinedLocalVariable(name, span) => {
-                let (line, col) = span.start_pos().line_col();
+                let (line, col) = span.line_and_col();
                 write!(
                     f,
                     "Undefined local variable `{}` at {}:{}",
@@ -66,7 +75,7 @@ impl<'a> fmt::Display for Error<'a> {
                 got,
                 span,
             } => {
-                let (line, col) = span.start_pos().line_col();
+                let (line, col) = span.line_and_col();
                 write!(
                     f,
                     "Wrong number of arguments at {}:{}. Expected {} got {}",
@@ -78,7 +87,7 @@ impl<'a> fmt::Display for Error<'a> {
                 got,
                 span,
             } => {
-                let (line, col) = span.start_pos().line_col();
+                let (line, col) = span.line_and_col();
                 write!(
                     f,
                     "Type error at {}:{}. Expected {} got {}",
@@ -86,7 +95,7 @@ impl<'a> fmt::Display for Error<'a> {
                 )
             }
             CannotInferType(span) => {
-                let (line, col) = span.start_pos().line_col();
+                let (line, col) = span.line_and_col();
                 write!(
                     f,
                     "Type error at {}:{}. The type cannot be inferred. Add type annotation",
@@ -94,7 +103,7 @@ impl<'a> fmt::Display for Error<'a> {
                 )
             }
             ReturnFromVoidFunction(span) => {
-                let (line, col) = span.start_pos().line_col();
+                let (line, col) = span.line_and_col();
                 write!(
                     f,
                     "Type error at {}:{}. You cannot return from functions without a return type",
@@ -102,7 +111,7 @@ impl<'a> fmt::Display for Error<'a> {
                 )
             }
             VoidTypeUsed(span) => {
-                let (line, col) = span.start_pos().line_col();
+                let (line, col) = span.line_and_col();
                 write!(
                     f,
                     "Type error at {}:{}. Expressions without a type cannot be used in other statements or expressions",
