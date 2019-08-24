@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::error::{Error, Result};
-use crate::eval::EnvStack;
+use crate::utils::EnvStack;
 use pest::Span;
 use std::collections::HashMap;
 

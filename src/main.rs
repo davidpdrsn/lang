@@ -8,6 +8,7 @@
 #[macro_use]
 extern crate pest_derive;
 
+mod utils;
 mod ast;
 mod error;
 mod eval;
