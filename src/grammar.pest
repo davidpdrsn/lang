@@ -12,7 +12,8 @@ function = {
 }
 function_body = { statement* }
 
-type_ = { identifier }
+type_ = { identifier | list_type }
+list_type = { "[" ~ type_ ~ "]"}
 
 statement = {
   function_call ~ ";"
@@ -24,7 +25,7 @@ statement = {
 
 return_statement = { "return" ~ expression }
 
-variable_binding = { "let" ~ identifier ~ "=" ~ expression }
+variable_binding = { "let" ~ identifier ~ (":" ~ type_)? ~ "=" ~ expression }
 
 reassign_variable = { identifier ~ "=" ~ expression }
 

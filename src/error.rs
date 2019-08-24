@@ -23,6 +23,7 @@ pub enum Error<'a> {
         got: Type,
         span: Span<'a>,
     },
+    CannotInferType(Span<'a>),
 }
 
 impl<'a> From<pest::error::Error<Rule>> for Error<'a> {
@@ -80,6 +81,14 @@ impl<'a> fmt::Display for Error<'a> {
                     f,
                     "Type error at {}:{}. Expected {} got {}",
                     line, col, expected, got
+                )
+            }
+            CannotInferType(span) => {
+                let (line, col) = span.start_pos().line_col();
+                write!(
+                    f,
+                    "Type error at {}:{}. The type cannot be inferred. Add type annotation",
+                    line, col
                 )
             }
         }

@@ -1,7 +1,7 @@
 use crate::ast::*;
-use pest::Span;
 use crate::error::{Error, Result};
 use crate::eval::EnvStack;
+use pest::Span;
 use std::collections::HashMap;
 
 pub struct TypeChecker;
@@ -37,23 +37,8 @@ fn check_function<'a>(
         env.insert(&ident.name, type_.clone());
     }
 
-    let mut return_type = None::<Type>;
-
-    check_statements(&function.body, fn_env, &mut return_type, &mut env)?;
-
-    let return_type = if let Some(return_type) = return_type {
-        return_type
-    } else {
-        Type::Void
-    };
-
-    if &return_type != &function.return_type {
-        Err(Error::TypeError {
-            expected: function.return_type.clone(),
-            got: return_type.clone(),
-            span: function.span.clone(),
-        })?;
-    }
+    let return_type = &function.return_type;
+    check_statements(&function.body, fn_env, return_type, &mut env)?;
 
     Ok(())
 }
@@ -61,7 +46,7 @@ fn check_function<'a>(
 fn check_statements<'a>(
     stmts: &[Statement<'a>],
     fn_env: &FnEnv<'a>,
-    return_type: &mut Option<Type>,
+    return_type: &Type,
     env: &mut Env<'a>,
 ) -> Result<'a, ()> {
     for stmt in stmts {
@@ -74,7 +59,7 @@ fn check_statements<'a>(
 fn check_statement<'a>(
     stmt: &Statement<'a>,
     fn_env: &FnEnv<'a>,
-    return_type: &mut Option<Type>,
+    return_type: &Type,
     env: &mut Env<'a>,
 ) -> Result<'a, ()> {
     match stmt {
@@ -83,52 +68,62 @@ fn check_statement<'a>(
         }
 
         Statement::Return(inner) => {
-            let type_ = check_expr(&inner.expr, fn_env, &env)?;
+            let type_ = check_expr(
+                &inner.expr,
+                &Some(return_type.clone()),
+                fn_env,
+                &env,
+            )?;
 
-            match return_type {
-                Some(return_type) if { &type_ != return_type } => {
-                    Err(Error::TypeError {
-                        expected: type_.clone(),
-                        got: return_type.clone(),
-                        span: inner.span.clone(),
-                    })?;
-                }
-                Some(_) => {}
-                None => {
-                    *return_type = Some(type_);
-                }
+            if &type_ != return_type {
+                Err(Error::TypeError {
+                    expected: type_.clone(),
+                    got: return_type.clone(),
+                    span: inner.span.clone(),
+                })?;
             }
         }
 
         Statement::VariableBinding(binding) => {
             let name = &binding.name.name;
-            let type_ = check_expr(&binding.expr, fn_env, &env)?;
+            let type_hint = &binding.type_;
+            let type_ = check_expr(&binding.expr, type_hint, fn_env, &env)?;
             env.insert(name, type_);
         }
 
         Statement::ReassignVariable(binding) => {
-            let type_ = check_expr(&binding.expr, fn_env, &env)?;
             let name = &binding.name.name;
 
-            if let Some(prev_type) = env.get(name) {
-                if &type_ != prev_type {
-                    Err(Error::TypeError {
-                        expected: prev_type.clone(),
-                        got: type_.clone(),
-                        span: binding.span.clone(),
-                    })?;
-                }
+            let prev_type = if let Some(prev_type) = env.get(name) {
+                prev_type
             } else {
-                Err(Error::UndefinedLocalVariable(
+                return Err(Error::UndefinedLocalVariable(
                     name.to_string(),
                     binding.span.clone(),
-                ))?;
+                ));
+            };
+
+            let type_ = check_expr(
+                &binding.expr,
+                &Some(prev_type.clone()),
+                fn_env,
+                &env,
+            )?;
+
+            if &type_ != prev_type {
+                Err(Error::TypeError {
+                    expected: prev_type.clone(),
+                    got: type_.clone(),
+                    span: binding.span.clone(),
+                })?;
             }
         }
 
         Statement::IfStatement(if_stmt) => {
             let condition = &if_stmt.condition;
-            let cond_type = check_expr(condition, fn_env, &env)?;
+
+            // TODO: What would a type hint here do?
+            let cond_type = check_expr(condition, &None, fn_env, &env)?;
 
             if cond_type != Type::Boolean {
                 Err(Error::TypeError {
@@ -153,8 +148,16 @@ fn check_statement<'a>(
     Ok(())
 }
 
+fn inner_type(type_: &Type) -> Option<Type> {
+    match type_ {
+        Type::Boolean | Type::String | Type::Integer | Type::Void => None,
+        Type::List(inner) => Some(inner.as_ref().clone()),
+    }
+}
+
 fn check_expr<'a>(
     expr: &Expr<'a>,
+    hint: &Option<Type>,
     fn_env: &FnEnv<'a>,
     env: &Env<'a>,
 ) -> Result<'a, Type> {
@@ -165,15 +168,25 @@ fn check_expr<'a>(
 
         Expr::ListLit(list) => {
             if list.elements.is_empty() {
-                unimplemented!("TODO: unknow type of empty list")
+                let type_ = if let Some(type_) = hint.as_ref() {
+                    type_
+                } else {
+                    let span = list.span.clone();
+                    return Err(Error::CannotInferType(span));
+                };
+                Ok(type_.clone())
             } else if list.elements.len() == 1 {
-                let first = check_expr(&list.elements[0], fn_env, env)?;
+                let inner_type = hint.as_ref().and_then(|h| inner_type(&h));
+                let first =
+                    check_expr(&list.elements[0], &inner_type, fn_env, env)?;
                 Ok(Type::List(Box::new(first)))
             } else {
-                let first = check_expr(&list.elements[0], fn_env, env)?;
+                let inner_type = hint.as_ref().and_then(|h| inner_type(&h));
+                let first =
+                    check_expr(&list.elements[0], &inner_type, fn_env, env)?;
 
                 for element in &list.elements[1..] {
-                    let other = check_expr(element, fn_env, env)?;
+                    let other = check_expr(element, &inner_type, fn_env, env)?;
                     if first != other {
                         Err(Error::TypeError {
                             expected: first.clone(),
@@ -226,7 +239,8 @@ fn check_call<'a>(
 
     for (required_type, expr) in function_type.arg_types.iter().zip(&call.args)
     {
-        let type_ = check_expr(expr, fn_env, &env)?;
+        let type_ =
+            check_expr(expr, &Some(required_type.clone()), fn_env, &env)?;
 
         if required_type != &type_ {
             Err(Error::TypeError {

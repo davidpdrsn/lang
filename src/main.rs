@@ -1,10 +1,10 @@
-#![deny(
-    unused_must_use,
-    unknown_lints,
-    dead_code,
-    unused_variables,
-    unused_imports
-)]
+// #![deny(
+//     unused_must_use,
+//     unknown_lints,
+//     dead_code,
+//     unused_variables,
+//     unused_imports
+// )]
 #[macro_use]
 extern crate pest_derive;
 
@@ -216,6 +216,42 @@ mod test {
         let output = unwrap_or_panic!(String::from_utf8(output));
 
         assert_eq!(output, "3\n");
+    }
+
+    #[test]
+    fn empty_list() {
+        let program = r#"
+            fn main() {
+                let list: [Integer] = [];
+                println(int_to_string(length(list)));
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
+        let output = unwrap_or_panic!(String::from_utf8(output));
+
+        assert_eq!(output, "0\n");
+    }
+
+    #[test]
+    fn empty_list_as_arg() {
+        let program = r#"
+            fn main() {
+                let l = foo([]);
+                println(int_to_string(l));
+            }
+
+            fn foo(as: [Integer]) -> Integer {
+                return length(as);
+            }
+        "#;
+
+        let mut output = Vec::<u8>::new();
+        unwrap_or_panic!(Interpreter::new().interpret(program, &mut output));
+        let output = unwrap_or_panic!(String::from_utf8(output));
+
+        assert_eq!(output, "0\n");
     }
 
     #[test]

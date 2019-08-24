@@ -116,14 +116,24 @@ impl<'a> Parse<'a> for Type {
 
     fn parse_pair_of_rule(type_: Pair<'a, Rule>) -> ParseResult<Self> {
         let mut type_ = type_.into_inner();
-        let name = Ident::parse(type_.next().unwrap())?;
 
-        match name.name {
-            "Boolean" => Ok(Type::Boolean),
-            "Integer" => Ok(Type::Integer),
-            "String" => Ok(Type::String),
-            // TODO: list
-            _ => unimplemented!("unknown type"),
+        let next = type_.next().unwrap();
+        match next.as_rule() {
+            Rule::identifier => {
+                let name = Ident::parse(next)?;
+                match name.name {
+                    "Boolean" => Ok(Type::Boolean),
+                    "Integer" => Ok(Type::Integer),
+                    "String" => Ok(Type::String),
+                    // TODO: list
+                    _ => unimplemented!("unknown type"),
+                }
+            }
+            Rule::list_type => {
+                let inner_type = Type::parse(next.into_inner().next().unwrap())?;
+                Ok(Type::List(Box::new(inner_type)))
+            }
+            _ => unreachable!(),
         }
     }
 }
@@ -293,6 +303,7 @@ impl<'a> Parse<'a> for Return<'a> {
 #[derive(Debug)]
 pub struct VariableBinding<'a> {
     pub name: Ident<'a>,
+    pub type_: Option<Type>,
     pub expr: Expr<'a>,
     pub span: Span<'a>,
 }
@@ -305,9 +316,20 @@ impl<'a> Parse<'a> for VariableBinding<'a> {
         let mut binding = binding.into_inner();
 
         let name = Ident::parse(binding.next().unwrap())?;
-        let expr = Expr::parse(binding.next().unwrap())?;
 
-        Ok(VariableBinding { name, expr, span })
+        let next = binding.next().unwrap();
+        match next.as_rule() {
+            Rule::type_ => {
+                let type_ = Type::parse(next)?;
+                let expr = Expr::parse(binding.next().unwrap())?;
+                Ok(VariableBinding { name, type_: Some(type_), expr, span })
+            },
+            Rule::expression => {
+                let expr = Expr::parse(next)?;
+                Ok(VariableBinding { name, type_: None, expr, span })
+            },
+            _ => unreachable!(),
+        }
     }
 }
 
