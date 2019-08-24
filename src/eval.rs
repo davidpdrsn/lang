@@ -4,7 +4,7 @@ use crate::{
     utils::{EnvStack, LineAndCol, Stack},
 };
 use pest::Span;
-use std::{collections::HashMap, hash::Hash, io::Write, fmt};
+use std::{collections::HashMap, fmt, hash::Hash, io::Write};
 
 type FnEnv<'a, W> = HashMap<&'a str, FnEnvEntry<'a, W>>;
 type LocalEnv<'a> = EnvStack<&'a str, Value>;
@@ -247,14 +247,6 @@ fn build_fn_env<W: Write>(program: Program) -> FnEnv<W> {
     }
 
     fn_env.insert("println", FnEnvEntry::BuiltIn(println_built_in()));
-    fn_env.insert(
-        "int_to_string",
-        FnEnvEntry::BuiltIn(int_to_string_built_in()),
-    );
-    fn_env.insert(
-        "bool_to_string",
-        FnEnvEntry::BuiltIn(bool_to_string_built_in()),
-    );
     fn_env.insert("length", FnEnvEntry::BuiltIn(length_built_in()));
 
     fn_env
@@ -266,42 +258,8 @@ fn println_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
             .get("input")
             .expect("Built-in `println` argument not found");
 
-        if let Value::String(input) = input {
-            writeln!(stdout, "{}", input).expect("`println` failed to write");
-            Ok(None)
-        } else {
-            panic!("Type error. `println` only supports strings")
-        }
-    })
-}
-
-fn int_to_string_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
-    Box::new(|_stdout: &mut W, env: &mut LocalEnv<'a>| {
-        let input = env
-            .get("input")
-            .expect("Built-in `int_to_string` argument not found");
-
-        if let Value::Integer(i) = input {
-            let string = format!("{}", i);
-            Ok(Some(Value::String(string)))
-        } else {
-            unreachable!("type error in eval (int_to_string)")
-        }
-    })
-}
-
-fn bool_to_string_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
-    Box::new(|_stdout: &mut W, env: &mut LocalEnv<'a>| {
-        let input = env
-            .get("input")
-            .expect("Built-in `bool_to_string` argument not found");
-
-        if let Value::Boolean(i) = input {
-            let string = format!("{}", i);
-            Ok(Some(Value::String(string)))
-        } else {
-            unreachable!("type error in eval (bool_to_string)")
-        }
+        writeln!(stdout, "{}", input).expect("`println` failed to write");
+        Ok(None)
     })
 }
 
@@ -314,7 +272,7 @@ fn length_built_in<'a, W: Write>() -> BuiltIn<'a, W> {
         if let Value::List(list) = input {
             Ok(Some(Value::Integer(list.len() as i32)))
         } else {
-            unreachable!("type error in eval (bool_to_string)")
+            unreachable!("type error in eval (length_built_in)")
         }
     })
 }
@@ -336,6 +294,26 @@ enum Value {
     Integer(i32),
     Boolean(bool),
     List(Vec<Value>),
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Value::*;
+
+        match self {
+            String(x) => write!(f, "{}", x),
+            Integer(x) => write!(f, "{}", x),
+            Boolean(x) => write!(f, "{}", x),
+            List(x) => {
+                let inner = x
+                    .iter()
+                    .map(|y| format!("{}", y))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "[{}]", inner)
+            }
+        }
+    }
 }
 
 #[derive(Debug)]

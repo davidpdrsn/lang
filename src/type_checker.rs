@@ -124,7 +124,6 @@ fn check_statement<'a>(
         Statement::IfStatement(if_stmt) => {
             let condition = &if_stmt.condition;
 
-            // TODO: What would a type hint here do?
             let cond_type = check_expr(condition, &None, fn_env, &env)
                 .not_void(&if_stmt.span)?;
 
@@ -153,7 +152,7 @@ fn check_statement<'a>(
 
 fn inner_type(type_: &Type) -> Option<Type> {
     match type_ {
-        Type::Boolean | Type::String | Type::Integer => None,
+        Type::Boolean | Type::String | Type::Integer | Type::Any => None,
         Type::List(inner) => Some(inner.as_ref().clone()),
     }
 }
@@ -294,32 +293,15 @@ fn build_fn_env<'a>(program: &Program<'a>) -> FnEnv<'a> {
     fn_env.insert(
         "println",
         FunctionType {
-            arg_types: vec![Type::String],
+            arg_types: vec![Type::Any],
             return_type: None,
-        },
-    );
-
-    fn_env.insert(
-        "int_to_string",
-        FunctionType {
-            arg_types: vec![Type::Integer],
-            return_type: Some(Type::String),
-        },
-    );
-
-    fn_env.insert(
-        "bool_to_string",
-        FunctionType {
-            arg_types: vec![Type::Boolean],
-            return_type: Some(Type::String),
         },
     );
 
     fn_env.insert(
         "length",
         FunctionType {
-            // TODO: Make this work for any list type
-            arg_types: vec![Type::List(Box::new(Type::Integer))],
+            arg_types: vec![Type::List(Box::new(Type::Any))],
             return_type: Some(Type::Integer),
         },
     );

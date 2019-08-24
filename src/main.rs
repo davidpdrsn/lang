@@ -176,7 +176,7 @@ mod test {
     fn integers() {
         let program = r#"
             fn main() {
-                println(int_to_string(1));
+                println(1);
             }
         "#;
 
@@ -191,8 +191,8 @@ mod test {
     fn bools() {
         let program = r#"
             fn main() {
-                println(bool_to_string(true));
-                println(bool_to_string(false));
+                println(true);
+                println(false);
             }
         "#;
 
@@ -208,7 +208,7 @@ mod test {
         let program = r#"
             fn main() {
                 let list = [1, 2, 3];
-                println(int_to_string(length(list)));
+                println(length(list));
             }
         "#;
 
@@ -224,7 +224,7 @@ mod test {
         let program = r#"
             fn main() {
                 let list: [Integer] = [];
-                println(int_to_string(length(list)));
+                println(length(list));
             }
         "#;
 
@@ -240,7 +240,7 @@ mod test {
         let program = r#"
             fn main() {
                 let l = foo([]);
-                println(int_to_string(l));
+                println(l);
             }
 
             fn foo(as: [Integer]) -> Integer {

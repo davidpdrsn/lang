@@ -74,11 +74,11 @@ impl<'a> Parse<'a> for Program<'a> {
 
 #[derive(Debug, Clone)]
 pub enum Type {
-    // Ident(Ident<'a>),
     Boolean,
     Integer,
     String,
     List(Box<Type>),
+    Any,
 }
 
 impl PartialEq for Type {
@@ -86,6 +86,8 @@ impl PartialEq for Type {
         use Type::*;
 
         match (self, other) {
+            (Any, _) => true,
+            (_, Any) => true,
             (Integer, Integer) => true,
             (Boolean, Boolean) => true,
             (String, String) => true,
@@ -102,6 +104,7 @@ impl fmt::Display for Type {
             Type::Integer => write!(f, "Integer"),
             Type::String => write!(f, "String"),
             Type::List(inner) => write!(f, "[{}]", inner),
+            Type::Any => write!(f, "Any"),
         }
     }
 }
