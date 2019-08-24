@@ -1,5 +1,5 @@
 use crate::{
-    utils::EnvStack,
+    utils::{Stack, EnvStack},
     ast::*,
     error::{Error, Result},
 };
