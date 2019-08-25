@@ -82,6 +82,15 @@ mod test {
     #[allow(unused_imports)]
     use super::*;
 
+    macro_rules! unwrap_or_panic {
+        ($expr:expr) => {
+            match $expr {
+                Ok(x) => x,
+                Err(e) => panic!("{}", e),
+            }
+        };
+    }
+
     #[test]
     fn test_files() {
         let files = test_program_files().unwrap();
@@ -94,7 +103,7 @@ mod test {
             let code = std::fs::read_to_string(&source_file).unwrap();
 
             let mut output = Vec::<u8>::new();
-            Interpreter::new().interpret(&code, &mut output).unwrap();
+            unwrap_or_panic!(Interpreter::new().interpret(&code, &mut output));
             let output = String::from_utf8(output).unwrap();
 
             let expected_output = std::fs::read_to_string(&stdout_file).unwrap();
