@@ -221,6 +221,12 @@ impl<'a, W: Write> Evaluator<'a, W> {
                 Ok(Value::Integer(lhs / rhs))
             }
 
+            Expr::Mod { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?.as_integer();
+                let rhs = self.eval_expr(&rhs, fn_env, env)?.as_integer();
+                Ok(Value::Integer(lhs % rhs))
+            }
+
             Expr::And { lhs, rhs, .. } => {
                 let lhs = self.eval_expr(&lhs, fn_env, env)?.as_boolean();
                 let rhs = self.eval_expr(&rhs, fn_env, env)?.as_boolean();

@@ -427,6 +427,11 @@ pub enum Expr<'a> {
         rhs: Box<Expr<'a>>,
         span: Span<'a>,
     },
+    Mod {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
     And {
         lhs: Box<Expr<'a>>,
         rhs: Box<Expr<'a>>,
@@ -484,6 +489,7 @@ impl<'a> Expr<'a> {
             Mul { span, .. } => span,
             Sub { span, .. } => span,
             Div { span, .. } => span,
+            Mod { span, .. } => span,
             And { span, .. } => span,
             Or { span, .. } => span,
             Eq { span, .. } => span,
@@ -509,6 +515,7 @@ lazy_static! {
                 | Operator::new(Rule::greater_than_or_equal, Assoc::Left),
             Operator::new(Rule::or, Assoc::Left),
             Operator::new(Rule::and, Assoc::Left),
+            Operator::new(Rule::modulo, Assoc::Left),
             Operator::new(Rule::add, Assoc::Left)
                 | Operator::new(Rule::subtract, Assoc::Left),
             Operator::new(Rule::multiply, Assoc::Left)
@@ -597,6 +604,11 @@ impl<'a> Parse<'a> for Expr<'a> {
                         span: span.clone(),
                     }),
                     Rule::greater_than_or_equal => Ok(Expr::Gte {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::modulo => Ok(Expr::Mod {
                         lhs: Box::new(lhs),
                         rhs: Box::new(rhs),
                         span: span.clone(),

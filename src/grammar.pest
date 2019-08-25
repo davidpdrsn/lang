@@ -61,6 +61,7 @@ operation = _{
   | less_than
   | greater_than_or_equal
   | greater_than
+  | modulo
 }
 add = { "+" }
 subtract = { "-" }
@@ -74,6 +75,7 @@ less_than = { "<" }
 less_than_or_equal = { "<=" }
 greater_than = { ">" }
 greater_than_or_equal = { ">=" }
+modulo = { "%" }
 
 function_call = { identifier ~ "(" ~ arguments ~ ")" }
 
