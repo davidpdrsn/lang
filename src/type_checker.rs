@@ -180,17 +180,21 @@ fn check_expr<'a>(
         Expr::Div { lhs, rhs, span } => {
             check_integer_bin_op(lhs, rhs, span, fn_env, env)
         }
-        Expr::Lt { lhs, rhs, span } => {
+        Expr::Mod { lhs, rhs, span } => {
             check_integer_bin_op(lhs, rhs, span, fn_env, env)
+        }
+
+        Expr::Lt { lhs, rhs, span } => {
+            check_integer_to_boolean_bin_op(lhs, rhs, span, fn_env, env)
         }
         Expr::Lte { lhs, rhs, span } => {
-            check_integer_bin_op(lhs, rhs, span, fn_env, env)
+            check_integer_to_boolean_bin_op(lhs, rhs, span, fn_env, env)
         }
         Expr::Gt { lhs, rhs, span } => {
-            check_integer_bin_op(lhs, rhs, span, fn_env, env)
+            check_integer_to_boolean_bin_op(lhs, rhs, span, fn_env, env)
         }
         Expr::Gte { lhs, rhs, span } => {
-            check_integer_bin_op(lhs, rhs, span, fn_env, env)
+            check_integer_to_boolean_bin_op(lhs, rhs, span, fn_env, env)
         }
 
         Expr::And { lhs, rhs, span } => {
@@ -315,6 +319,22 @@ fn check_boolean_bin_op<'a>(
     check_expr(&rhs, &None, fn_env, env)
         .not_void(&span)?
         .as_boolean(&span)?;
+    Ok(Some(Type::Boolean))
+}
+
+fn check_integer_to_boolean_bin_op<'a>(
+    lhs: &Expr<'a>,
+    rhs: &Expr<'a>,
+    span: &Span<'a>,
+    fn_env: &FnEnv<'a>,
+    env: &Env<'a>,
+) -> Result<'a, Option<Type>> {
+    check_expr(&lhs, &None, fn_env, env)
+        .not_void(&span)?
+        .as_integer(&span)?;
+    check_expr(&rhs, &None, fn_env, env)
+        .not_void(&span)?
+        .as_integer(&span)?;
     Ok(Some(Type::Boolean))
 }
 
