@@ -180,6 +180,18 @@ fn check_expr<'a>(
         Expr::Div { lhs, rhs, span } => {
             check_integer_bin_op(lhs, rhs, span, fn_env, env)
         }
+        Expr::Lt { lhs, rhs, span } => {
+            check_integer_bin_op(lhs, rhs, span, fn_env, env)
+        }
+        Expr::Lte { lhs, rhs, span } => {
+            check_integer_bin_op(lhs, rhs, span, fn_env, env)
+        }
+        Expr::Gt { lhs, rhs, span } => {
+            check_integer_bin_op(lhs, rhs, span, fn_env, env)
+        }
+        Expr::Gte { lhs, rhs, span } => {
+            check_integer_bin_op(lhs, rhs, span, fn_env, env)
+        }
 
         Expr::And { lhs, rhs, span } => {
             check_boolean_bin_op(lhs, rhs, span, fn_env, env)

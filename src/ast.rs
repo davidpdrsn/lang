@@ -447,6 +447,26 @@ pub enum Expr<'a> {
         rhs: Box<Expr<'a>>,
         span: Span<'a>,
     },
+    Lt {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
+    Lte {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
+    Gt {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
+    Gte {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
 }
 
 impl<'a> Expr<'a> {
@@ -468,6 +488,10 @@ impl<'a> Expr<'a> {
             Or { span, .. } => span,
             Eq { span, .. } => span,
             NotEq { span, .. } => span,
+            Lt { span, .. } => span,
+            Lte { span, .. } => span,
+            Gt { span, .. } => span,
+            Gte { span, .. } => span,
         };
 
         span.clone()
@@ -478,7 +502,11 @@ lazy_static! {
     static ref PREC_CLIMBER: PrecClimber<Rule> = {
         PrecClimber::new(vec![
             Operator::new(Rule::equals, Assoc::Left)
-                | Operator::new(Rule::not_equals, Assoc::Left),
+                | Operator::new(Rule::not_equals, Assoc::Left)
+                | Operator::new(Rule::less_than, Assoc::Left)
+                | Operator::new(Rule::less_than_or_equal, Assoc::Left)
+                | Operator::new(Rule::greater_than, Assoc::Left)
+                | Operator::new(Rule::greater_than_or_equal, Assoc::Left),
             Operator::new(Rule::or, Assoc::Left),
             Operator::new(Rule::and, Assoc::Left),
             Operator::new(Rule::add, Assoc::Left)
@@ -549,6 +577,26 @@ impl<'a> Parse<'a> for Expr<'a> {
                         span: span.clone(),
                     }),
                     Rule::not_equals => Ok(Expr::NotEq {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::less_than => Ok(Expr::Lt {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::less_than_or_equal => Ok(Expr::Lte {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::greater_than => Ok(Expr::Gt {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::greater_than_or_equal => Ok(Expr::Gte {
                         lhs: Box::new(lhs),
                         rhs: Box::new(rhs),
                         span: span.clone(),

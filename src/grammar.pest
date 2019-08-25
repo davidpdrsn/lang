@@ -48,7 +48,20 @@ term = _{
   | "(" ~ expression ~ ")"
 }
 
-operation = _{ add | subtract | multiply | divide | and | or | equals | not_equals }
+operation = _{
+  add
+  | subtract
+  | multiply
+  | divide
+  | and
+  | or
+  | equals
+  | not_equals
+  | less_than_or_equal
+  | less_than
+  | greater_than_or_equal
+  | greater_than
+}
 add = { "+" }
 subtract = { "-" }
 multiply = { "*" }
@@ -57,6 +70,10 @@ and = { "&&" }
 or = { "||" }
 equals = { "==" }
 not_equals = { "!=" }
+less_than = { "<" }
+less_than_or_equal = { "<=" }
+greater_than = { ">" }
+greater_than_or_equal = { ">=" }
 
 function_call = { identifier ~ "(" ~ arguments ~ ")" }
 

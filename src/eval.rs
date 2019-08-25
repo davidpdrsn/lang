@@ -245,6 +245,30 @@ impl<'a, W: Write> Evaluator<'a, W> {
                 Ok(Value::Boolean(lhs != rhs))
             }
 
+            Expr::Lt { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?.as_integer();
+                let rhs = self.eval_expr(&rhs, fn_env, env)?.as_integer();
+                Ok(Value::Boolean(lhs < rhs))
+            }
+
+            Expr::Lte { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?.as_integer();
+                let rhs = self.eval_expr(&rhs, fn_env, env)?.as_integer();
+                Ok(Value::Boolean(lhs <= rhs))
+            }
+
+            Expr::Gt { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?.as_integer();
+                let rhs = self.eval_expr(&rhs, fn_env, env)?.as_integer();
+                Ok(Value::Boolean(lhs > rhs))
+            }
+
+            Expr::Gte { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?.as_integer();
+                let rhs = self.eval_expr(&rhs, fn_env, env)?.as_integer();
+                Ok(Value::Boolean(lhs >= rhs))
+            }
+
             Expr::ListLit(lit) => {
                 let mut acc = vec![];
                 for element in &lit.elements {
