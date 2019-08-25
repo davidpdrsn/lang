@@ -1,0 +1,10 @@
+fn main() {
+    let a = 1;
+    add_one_and_print(a);
+    println(a);
+}
+
+fn add_one_and_print(a: Integer) {
+    a = a + 1;
+    println(a);
+}
