@@ -437,6 +437,16 @@ pub enum Expr<'a> {
         rhs: Box<Expr<'a>>,
         span: Span<'a>,
     },
+    Eq {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
+    NotEq {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
 }
 
 impl<'a> Expr<'a> {
@@ -456,6 +466,8 @@ impl<'a> Expr<'a> {
             Div { span, .. } => span,
             And { span, .. } => span,
             Or { span, .. } => span,
+            Eq { span, .. } => span,
+            NotEq { span, .. } => span,
         };
 
         span.clone()
@@ -465,6 +477,8 @@ impl<'a> Expr<'a> {
 lazy_static! {
     static ref PREC_CLIMBER: PrecClimber<Rule> = {
         PrecClimber::new(vec![
+            Operator::new(Rule::equals, Assoc::Left)
+                | Operator::new(Rule::not_equals, Assoc::Left),
             Operator::new(Rule::or, Assoc::Left),
             Operator::new(Rule::and, Assoc::Left),
             Operator::new(Rule::add, Assoc::Left)
@@ -525,6 +539,16 @@ impl<'a> Parse<'a> for Expr<'a> {
                         span: span.clone(),
                     }),
                     Rule::or => Ok(Expr::Or {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::equals => Ok(Expr::Eq {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::not_equals => Ok(Expr::NotEq {
                         lhs: Box::new(lhs),
                         rhs: Box::new(rhs),
                         span: span.clone(),

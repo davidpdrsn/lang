@@ -48,13 +48,15 @@ term = _{
   | "(" ~ expression ~ ")"
 }
 
-operation = _{ add | subtract | multiply | divide | and | or }
+operation = _{ add | subtract | multiply | divide | and | or | equals | not_equals }
 add = { "+" }
 subtract = { "-" }
 multiply = { "*" }
 divide = { "/" }
 and = { "&&" }
 or = { "||" }
+equals = { "==" }
+not_equals = { "!=" }
 
 function_call = { identifier ~ "(" ~ arguments ~ ")" }
 

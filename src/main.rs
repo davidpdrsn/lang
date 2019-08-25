@@ -106,7 +106,8 @@ mod test {
             unwrap_or_panic!(Interpreter::new().interpret(&code, &mut output));
             let output = String::from_utf8(output).unwrap();
 
-            let expected_output = std::fs::read_to_string(&stdout_file).unwrap();
+            let expected_output =
+                std::fs::read_to_string(&stdout_file).unwrap();
             assert_eq!(output, expected_output);
         }
     }

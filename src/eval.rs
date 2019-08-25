@@ -233,6 +233,18 @@ impl<'a, W: Write> Evaluator<'a, W> {
                 Ok(Value::Boolean(lhs || rhs))
             }
 
+            Expr::Eq { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?;
+                let rhs = self.eval_expr(&rhs, fn_env, env)?;
+                Ok(Value::Boolean(lhs == rhs))
+            }
+
+            Expr::NotEq { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?;
+                let rhs = self.eval_expr(&rhs, fn_env, env)?;
+                Ok(Value::Boolean(lhs != rhs))
+            }
+
             Expr::ListLit(lit) => {
                 let mut acc = vec![];
                 for element in &lit.elements {
@@ -324,7 +336,7 @@ fn main_call(span: Span) -> Call {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 enum Value {
     String(String),
     Integer(i32),

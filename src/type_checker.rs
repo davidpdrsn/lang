@@ -188,6 +188,34 @@ fn check_expr<'a>(
             check_boolean_bin_op(lhs, rhs, span, fn_env, env)
         }
 
+        Expr::Eq { lhs, rhs, span } => {
+            let lhs = check_expr(&lhs, &None, fn_env, env).not_void(&span)?;
+            let rhs = check_expr(&rhs, &None, fn_env, env).not_void(&span)?;
+            if lhs == rhs {
+                Ok(Some(Type::Boolean))
+            } else {
+                Err(Error::TypeError {
+                    expected: lhs.clone(),
+                    got: rhs.clone(),
+                    span: span.clone(),
+                })
+            }
+        }
+
+        Expr::NotEq { lhs, rhs, span } => {
+            let lhs = check_expr(&lhs, &None, fn_env, env).not_void(&span)?;
+            let rhs = check_expr(&rhs, &None, fn_env, env).not_void(&span)?;
+            if lhs == rhs {
+                Ok(Some(Type::Boolean))
+            } else {
+                Err(Error::TypeError {
+                    expected: lhs.clone(),
+                    got: rhs.clone(),
+                    span: span.clone(),
+                })
+            }
+        }
+
         Expr::ListLit(list) => {
             let span = list.span.clone();
 
