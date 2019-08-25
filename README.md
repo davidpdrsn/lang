@@ -10,7 +10,8 @@ Features:
 - Imperative
 - Static typing
 - Local type inference
-- Product types
+- Product types (structs)
+- Sum types (enums)
 
 Syntax:
 
