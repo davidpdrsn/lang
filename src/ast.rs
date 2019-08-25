@@ -102,7 +102,7 @@ impl PartialEq for Type {
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Type::Boolean => write!(f, "Bool"),
+            Type::Boolean => write!(f, "Boolean"),
             Type::Integer => write!(f, "Integer"),
             Type::String => write!(f, "String"),
             Type::List(inner) => write!(f, "[{}]", inner),
