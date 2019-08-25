@@ -157,22 +157,6 @@ fn inner_type(type_: &Type) -> Option<Type> {
     }
 }
 
-fn check_integer_bin_op<'a>(
-    lhs: &Expr<'a>,
-    rhs: &Expr<'a>,
-    span: &Span<'a>,
-    fn_env: &FnEnv<'a>,
-    env: &Env<'a>,
-) -> Result<'a, Option<Type>> {
-    check_expr(&lhs, &None, fn_env, env)
-        .not_void(&span)?
-        .as_integer(&span)?;
-    check_expr(&rhs, &None, fn_env, env)
-        .not_void(&span)?
-        .as_integer(&span)?;
-    Ok(Some(Type::Integer))
-}
-
 fn check_expr<'a>(
     expr: &Expr<'a>,
     hint: &Option<Type>,
@@ -195,6 +179,13 @@ fn check_expr<'a>(
         }
         Expr::Div { lhs, rhs, span } => {
             check_integer_bin_op(lhs, rhs, span, fn_env, env)
+        }
+
+        Expr::And { lhs, rhs, span } => {
+            check_boolean_bin_op(lhs, rhs, span, fn_env, env)
+        }
+        Expr::Or { lhs, rhs, span } => {
+            check_boolean_bin_op(lhs, rhs, span, fn_env, env)
         }
 
         Expr::ListLit(list) => {
@@ -253,6 +244,38 @@ fn check_expr<'a>(
 
         Expr::Call(call) => check_call(call, fn_env, env),
     }
+}
+
+fn check_integer_bin_op<'a>(
+    lhs: &Expr<'a>,
+    rhs: &Expr<'a>,
+    span: &Span<'a>,
+    fn_env: &FnEnv<'a>,
+    env: &Env<'a>,
+) -> Result<'a, Option<Type>> {
+    check_expr(&lhs, &None, fn_env, env)
+        .not_void(&span)?
+        .as_integer(&span)?;
+    check_expr(&rhs, &None, fn_env, env)
+        .not_void(&span)?
+        .as_integer(&span)?;
+    Ok(Some(Type::Integer))
+}
+
+fn check_boolean_bin_op<'a>(
+    lhs: &Expr<'a>,
+    rhs: &Expr<'a>,
+    span: &Span<'a>,
+    fn_env: &FnEnv<'a>,
+    env: &Env<'a>,
+) -> Result<'a, Option<Type>> {
+    check_expr(&lhs, &None, fn_env, env)
+        .not_void(&span)?
+        .as_boolean(&span)?;
+    check_expr(&rhs, &None, fn_env, env)
+        .not_void(&span)?
+        .as_boolean(&span)?;
+    Ok(Some(Type::Boolean))
 }
 
 fn check_call<'a>(
@@ -369,6 +392,17 @@ impl Type {
             Type::Integer => Ok(()),
             _ => Err(Error::TypeError {
                 expected: Type::Integer,
+                got: self,
+                span: span.clone(),
+            }),
+        }
+    }
+
+    fn as_boolean<'a>(self, span: &Span<'a>) -> Result<'a, ()> {
+        match self {
+            Type::Boolean => Ok(()),
+            _ => Err(Error::TypeError {
+                expected: Type::Boolean,
                 got: self,
                 span: span.clone(),
             }),

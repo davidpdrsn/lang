@@ -427,6 +427,16 @@ pub enum Expr<'a> {
         rhs: Box<Expr<'a>>,
         span: Span<'a>,
     },
+    And {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
+    Or {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
 }
 
 impl<'a> Expr<'a> {
@@ -444,6 +454,8 @@ impl<'a> Expr<'a> {
             Mul { span, .. } => span,
             Sub { span, .. } => span,
             Div { span, .. } => span,
+            And { span, .. } => span,
+            Or { span, .. } => span,
         };
 
         span.clone()
@@ -453,6 +465,8 @@ impl<'a> Expr<'a> {
 lazy_static! {
     static ref PREC_CLIMBER: PrecClimber<Rule> = {
         PrecClimber::new(vec![
+            Operator::new(Rule::or, Assoc::Left),
+            Operator::new(Rule::and, Assoc::Left),
             Operator::new(Rule::add, Assoc::Left)
                 | Operator::new(Rule::subtract, Assoc::Left),
             Operator::new(Rule::multiply, Assoc::Left)
@@ -475,9 +489,7 @@ impl<'a> Parse<'a> for Expr<'a> {
                     Ok(Expr::LocalVariable(LocalVariable::parse(pair)?))
                 }
                 Rule::function_call => Ok(Expr::Call(Call::parse(pair)?)),
-                Rule::integer => {
-                    Ok(Expr::IntegerLit(IntegerLit::parse(pair)?))
-                }
+                Rule::integer => Ok(Expr::IntegerLit(IntegerLit::parse(pair)?)),
                 Rule::boolean => Ok(Expr::BooleanLit(BooleanLit::parse(pair)?)),
                 Rule::list => Ok(Expr::ListLit(ListLit::parse(pair)?)),
                 Rule::expression => Expr::parse(pair),
@@ -503,6 +515,16 @@ impl<'a> Parse<'a> for Expr<'a> {
                         span: span.clone(),
                     }),
                     Rule::divide => Ok(Expr::Div {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::and => Ok(Expr::And {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::or => Ok(Expr::Or {
                         lhs: Box::new(lhs),
                         rhs: Box::new(rhs),
                         span: span.clone(),

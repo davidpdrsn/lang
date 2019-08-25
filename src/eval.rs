@@ -221,6 +221,18 @@ impl<'a, W: Write> Evaluator<'a, W> {
                 Ok(Value::Integer(lhs / rhs))
             }
 
+            Expr::And { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?.as_boolean();
+                let rhs = self.eval_expr(&rhs, fn_env, env)?.as_boolean();
+                Ok(Value::Boolean(lhs && rhs))
+            }
+
+            Expr::Or { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?.as_boolean();
+                let rhs = self.eval_expr(&rhs, fn_env, env)?.as_boolean();
+                Ok(Value::Boolean(lhs || rhs))
+            }
+
             Expr::ListLit(lit) => {
                 let mut acc = vec![];
                 for element in &lit.elements {
@@ -322,10 +334,18 @@ enum Value {
 
 impl Value {
     fn as_integer<'a>(self) -> i32 {
-        if let Value::Integer(i) = self {
-            i
+        if let Value::Integer(x) = self {
+            x
         } else {
             unreachable!("type error in eval (as_integer)")
+        }
+    }
+
+    fn as_boolean<'a>(self) -> bool {
+        if let Value::Boolean(x) = self {
+            x
+        } else {
+            unreachable!("type error in eval (as_boolean)")
         }
     }
 }
