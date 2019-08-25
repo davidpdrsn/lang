@@ -1,0 +1,4 @@
+fn main() {
+    println(10 % 2 == 0);
+    println(10 % 3 == 0);
+}

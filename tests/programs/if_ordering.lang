@@ -1,0 +1,7 @@
+fn main() {
+    if 1 <= 100 {
+        println("OK");
+    } else {
+        println("Fail");
+    }
+}
