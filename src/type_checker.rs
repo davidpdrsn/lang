@@ -157,6 +157,22 @@ fn inner_type(type_: &Type) -> Option<Type> {
     }
 }
 
+fn check_integer_bin_op<'a>(
+    lhs: &Expr<'a>,
+    rhs: &Expr<'a>,
+    span: &Span<'a>,
+    fn_env: &FnEnv<'a>,
+    env: &Env<'a>,
+) -> Result<'a, Option<Type>> {
+    check_expr(&lhs, &None, fn_env, env)
+        .not_void(&span)?
+        .as_integer(&span)?;
+    check_expr(&rhs, &None, fn_env, env)
+        .not_void(&span)?
+        .as_integer(&span)?;
+    Ok(Some(Type::Integer))
+}
+
 fn check_expr<'a>(
     expr: &Expr<'a>,
     hint: &Option<Type>,
@@ -167,6 +183,19 @@ fn check_expr<'a>(
         Expr::StringLit(_) => Ok(Some(Type::String)),
         Expr::IntegerLit(_) => Ok(Some(Type::Integer)),
         Expr::BooleanLit(_) => Ok(Some(Type::Boolean)),
+
+        Expr::Add { lhs, rhs, span } => {
+            check_integer_bin_op(lhs, rhs, span, fn_env, env)
+        }
+        Expr::Sub { lhs, rhs, span } => {
+            check_integer_bin_op(lhs, rhs, span, fn_env, env)
+        }
+        Expr::Mul { lhs, rhs, span } => {
+            check_integer_bin_op(lhs, rhs, span, fn_env, env)
+        }
+        Expr::Div { lhs, rhs, span } => {
+            check_integer_bin_op(lhs, rhs, span, fn_env, env)
+        }
 
         Expr::ListLit(list) => {
             let span = list.span.clone();
@@ -330,6 +359,19 @@ impl<'a> NotVoid<'a> for Result<'a, Option<Type>> {
             Err(e) => Err(e),
             Ok(Some(t)) => Ok(t),
             Ok(None) => Err(Error::VoidTypeUsed(span.clone())),
+        }
+    }
+}
+
+impl Type {
+    fn as_integer<'a>(self, span: &Span<'a>) -> Result<'a, ()> {
+        match self {
+            Type::Integer => Ok(()),
+            _ => Err(Error::TypeError {
+                expected: Type::Integer,
+                got: self,
+                span: span.clone(),
+            }),
         }
     }
 }

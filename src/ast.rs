@@ -1,6 +1,8 @@
 use crate::Rule;
+use lazy_static::lazy_static;
 use pest::{
     iterators::{Pair, Pairs},
+    prec_climber::{Assoc, Operator, PrecClimber},
     Span,
 };
 use std::fmt;
@@ -130,7 +132,8 @@ impl<'a> Parse<'a> for Type {
                 }
             }
             Rule::list_type => {
-                let inner_type = Type::parse(next.into_inner().next().unwrap())?;
+                let inner_type =
+                    Type::parse(next.into_inner().next().unwrap())?;
                 Ok(Type::List(Box::new(inner_type)))
             }
             _ => unreachable!(),
@@ -322,12 +325,22 @@ impl<'a> Parse<'a> for VariableBinding<'a> {
             Rule::type_ => {
                 let type_ = Type::parse(next)?;
                 let expr = Expr::parse(binding.next().unwrap())?;
-                Ok(VariableBinding { name, type_: Some(type_), expr, span })
-            },
+                Ok(VariableBinding {
+                    name,
+                    type_: Some(type_),
+                    expr,
+                    span,
+                })
+            }
             Rule::expression => {
                 let expr = Expr::parse(next)?;
-                Ok(VariableBinding { name, type_: None, expr, span })
-            },
+                Ok(VariableBinding {
+                    name,
+                    type_: None,
+                    expr,
+                    span,
+                })
+            }
             _ => unreachable!(),
         }
     }
@@ -394,6 +407,26 @@ pub enum Expr<'a> {
     ListLit(ListLit<'a>),
     LocalVariable(LocalVariable<'a>),
     Call(Call<'a>),
+    Add {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
+    Sub {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
+    Mul {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
+    Div {
+        lhs: Box<Expr<'a>>,
+        rhs: Box<Expr<'a>>,
+        span: Span<'a>,
+    },
 }
 
 impl<'a> Expr<'a> {
@@ -407,31 +440,77 @@ impl<'a> Expr<'a> {
             ListLit(x) => &x.span,
             LocalVariable(x) => &x.span,
             Call(x) => &x.span,
+            Add { span, .. } => span,
+            Mul { span, .. } => span,
+            Sub { span, .. } => span,
+            Div { span, .. } => span,
         };
 
         span.clone()
     }
 }
 
+lazy_static! {
+    static ref PREC_CLIMBER: PrecClimber<Rule> = {
+        PrecClimber::new(vec![
+            Operator::new(Rule::add, Assoc::Left)
+                | Operator::new(Rule::subtract, Assoc::Left),
+            Operator::new(Rule::multiply, Assoc::Left)
+                | Operator::new(Rule::divide, Assoc::Left),
+        ])
+    };
+}
+
 impl<'a> Parse<'a> for Expr<'a> {
     const RULE: Rule = Rule::expression;
 
     fn parse_pair_of_rule(expr: Pair<'a, Rule>) -> ParseResult<Self> {
-        let inner = expr.into_inner().next().unwrap();
+        let span = expr.as_span();
 
-        let parsed = match inner.as_rule() {
-            Rule::string => Expr::StringLit(StringLit::parse(inner)?),
-            Rule::identifier => {
-                Expr::LocalVariable(LocalVariable::parse(inner)?)
-            }
-            Rule::function_call => Expr::Call(Call::parse(inner)?),
-            Rule::integer => Expr::IntegerLit(IntegerLit::parse(inner)?),
-            Rule::boolean => Expr::BooleanLit(BooleanLit::parse(inner)?),
-            Rule::list => Expr::ListLit(ListLit::parse(inner)?),
-            other => panic!("expr parse error at {:?}", other),
-        };
-
-        Ok(parsed)
+        PREC_CLIMBER.climb(
+            expr.into_inner(),
+            |pair: Pair<Rule>| match pair.as_rule() {
+                Rule::string => Ok(Expr::StringLit(StringLit::parse(pair)?)),
+                Rule::identifier => {
+                    Ok(Expr::LocalVariable(LocalVariable::parse(pair)?))
+                }
+                Rule::function_call => Ok(Expr::Call(Call::parse(pair)?)),
+                Rule::integer => {
+                    Ok(Expr::IntegerLit(IntegerLit::parse(pair)?))
+                }
+                Rule::boolean => Ok(Expr::BooleanLit(BooleanLit::parse(pair)?)),
+                Rule::list => Ok(Expr::ListLit(ListLit::parse(pair)?)),
+                Rule::expression => Expr::parse(pair),
+                other => panic!("expr parse error at {:?}", other),
+            },
+            |lhs: ParseResult<Expr>, op: Pair<Rule>, rhs: ParseResult<Expr>| {
+                let lhs = lhs?;
+                let rhs = rhs?;
+                match op.as_rule() {
+                    Rule::add => Ok(Expr::Add {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::subtract => Ok(Expr::Sub {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::multiply => Ok(Expr::Mul {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    Rule::divide => Ok(Expr::Div {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        span: span.clone(),
+                    }),
+                    _ => unreachable!("second"),
+                }
+            },
+        )
     }
 }
 
@@ -465,6 +544,7 @@ impl<'a> Parse<'a> for IntegerLit<'a> {
         let span = integer_lit.as_span();
         let integer = integer_lit
             .as_str()
+            .trim_end()
             .parse()
             .expect("failed to parse integer literal as int. Should have been tokenizer error");
         Ok(IntegerLit { integer, span })

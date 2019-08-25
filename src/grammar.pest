@@ -37,14 +37,22 @@ if_statement_body = { statement* }
 parameters = { ((identifier ~ ":" ~ type_ ~ ","?) ~ ","?)* }
 arguments = { ((expression ~ ","?) ~ ","?)* }
 
-expression = {
+expression = { term ~ (operation ~ term)* }
+term = _{
   string
   | boolean
   | integer
   | function_call
   | identifier
   | list
+  | "(" ~ expression ~ ")"
 }
+
+operation = _{ add | subtract | multiply | divide }
+add = { "+" }
+subtract = { "-" }
+multiply = { "*" }
+divide = { "/" }
 
 function_call = { identifier ~ "(" ~ arguments ~ ")" }
 

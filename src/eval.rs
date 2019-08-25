@@ -197,6 +197,30 @@ impl<'a, W: Write> Evaluator<'a, W> {
 
             Expr::BooleanLit(lit) => Ok(Value::Boolean(lit.boolean)),
 
+            Expr::Add { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?.as_integer();
+                let rhs = self.eval_expr(&rhs, fn_env, env)?.as_integer();
+                Ok(Value::Integer(lhs + rhs))
+            }
+
+            Expr::Sub { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?.as_integer();
+                let rhs = self.eval_expr(&rhs, fn_env, env)?.as_integer();
+                Ok(Value::Integer(lhs - rhs))
+            }
+
+            Expr::Mul { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?.as_integer();
+                let rhs = self.eval_expr(&rhs, fn_env, env)?.as_integer();
+                Ok(Value::Integer(lhs * rhs))
+            }
+
+            Expr::Div { lhs, rhs, .. } => {
+                let lhs = self.eval_expr(&lhs, fn_env, env)?.as_integer();
+                let rhs = self.eval_expr(&rhs, fn_env, env)?.as_integer();
+                Ok(Value::Integer(lhs / rhs))
+            }
+
             Expr::ListLit(lit) => {
                 let mut acc = vec![];
                 for element in &lit.elements {
@@ -294,6 +318,16 @@ enum Value {
     Integer(i32),
     Boolean(bool),
     List(Vec<Value>),
+}
+
+impl Value {
+    fn as_integer<'a>(self) -> i32 {
+        if let Value::Integer(i) = self {
+            i
+        } else {
+            unreachable!("type error in eval (as_integer)")
+        }
+    }
 }
 
 impl fmt::Display for Value {
