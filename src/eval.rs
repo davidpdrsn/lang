@@ -4,7 +4,7 @@ use crate::{
     utils::{EnvStack, LineAndCol, Stack},
 };
 use pest::Span;
-use std::{collections::HashMap, fmt, hash::Hash, io::Write};
+use std::{collections::HashMap, fmt, io::Write};
 
 type FnEnv<'a, W> = HashMap<&'a str, FnEnvEntry<'a, W>>;
 type LocalEnv<'a> = EnvStack<&'a str, Value>;
